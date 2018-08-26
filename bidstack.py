@@ -51,15 +51,16 @@ class BidStack(Document):
 	It is designed to offer a clean and intuitive interface for exploring NEM bid stacks. 
 	Each Bidstack object is expected to be specific to a given dispatch time period.
  	"""
-	bids = MapField(EmbeddedDocumentField(Bid))
 	trading_period = DateTimeField(unique=True)
+	bids = MapField(EmbeddedDocumentField(Bid))
 	
-	def __init__(self, dt):
+	
+	def clean(self):
 		"""Pass the constructor a python datetime object and a BidStack object will be constructed with the relevant data filled."""
-		Document.__init__(self)
+		
 		# Convert the datetime object to a pendulum object.
-		dt = pendulum.instance(dt)
-		self.trading_period = dt
+		dt = pendulum.instance(self.trading_period)
+		
 		# HOW COOL IS THE NEM trading periods sensibly start at 4:30 am not midnight!
 		settlement_date = pendulum.instance(dt)
 		if(settlement_date.hour <= 4 and settlement_date.minute != 0):

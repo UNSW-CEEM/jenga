@@ -41,7 +41,7 @@ class BidPerOffer(Document):
 	BIDSETTLEMENTDATE = DateTimeField()
 	OFFERDATE = DateTimeField()
 	PERIODID = StringField()
-	VERSIONNO = Intfield()
+	VERSIONNO = IntField()
 	MAXAVAIL = FloatField()
 	FIXEDLOAD = FloatField()
 	ROCUP = FloatField()
