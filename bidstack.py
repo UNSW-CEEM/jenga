@@ -118,7 +118,6 @@ if __name__ == "__main__":
 		bs = BidStack(dt)
 		bs.save()
 		
-	
 	bid = bs.getBid('MINTARO')
 	for i in range(1, 8):
 		print (i, bid.get_price(i), bid.get_volume(i))
