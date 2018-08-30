@@ -6,6 +6,7 @@ from bid_model import BidDayOffer, BidPerOffer
 import pendulum
 import json
 import hashlib
+from mongoengine.errors import NotUniqueError
 
 path = "data/PUBLIC_DVD_BIDPEROFFER_D_201806010000.CSV"
 
@@ -26,7 +27,7 @@ with open(path, 'rt') as f:
 			# Make empty strings into None objects.
 			for key in row:
 				row[key] = None if row[key] == "" else row[key]
-			if not BidPerOffer.objects(rowhash = rowhash):
+			try:
 				print("Saving Bid Period Offer ",rowhash)
 				bid = BidPerOffer(
 					SETTLEMENTDATE = row['SETTLEMENTDATE'],
@@ -61,4 +62,7 @@ with open(path, 'rt') as f:
 					rowhash = rowhash
 				)
 				bid.save()
+			except NotUniqueError:
+				print("Didn't save - already in DB!")
+				pass
 			

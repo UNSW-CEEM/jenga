@@ -31,7 +31,7 @@ class BidDayOffer(Document):
 	LASTCHANGED = DateTimeField()
 	MR_FACTOR = FloatField()
 	ENTRYTYPE = StringField()
-	rowhash = StringField()
+	rowhash = StringField(unique=True)
 
 class BidPerOffer(Document):
 	
@@ -64,5 +64,5 @@ class BidPerOffer(Document):
 	PASAAVAILABILITY = FloatField()
 	INTERVAL_DATETIME = DateTimeField()
 	MR_CAPACITY = FloatField()
-	rowhash = StringField()
+	rowhash = StringField(unique=True)
 
