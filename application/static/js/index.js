@@ -12,7 +12,15 @@ Vue.component('price-chart',{
     `,
     mounted(){
 
-          $.getJSON('/prices/NSW/1522987200/1525579200', function(result){
+        $.getJSON('/bidstack/dates', function(response){
+         
+            var start_date = response[0];
+            var end_date = response[response.length - 1];
+
+            
+
+        //   $.getJSON('/prices/NSW/1522987200/1525579200', function(result){
+            $.getJSON('/prices/NSW/'+start_date+'/'+end_date, function(result){
                 console.log('Prices', result);
                 // var data = {
                 //     // A labels array that can contain any sort of values
@@ -84,6 +92,7 @@ Vue.component('price-chart',{
                     }]
                 });
           });
+        });
         }
 });
 
