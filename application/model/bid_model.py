@@ -33,6 +33,38 @@ class BidDayOffer(Document):
 	ENTRYTYPE = StringField()
 	rowhash = StringField(unique=True)
 
+	def to_dict(self):
+		return {
+			'SETTLEMENTDATE' : self.SETTLEMENTDATE,
+			'DUID' : self.DUID,
+			'BIDTYPE' : self.BIDTYPE,
+			'BIDSETTLEMENTDATE' : self.BIDSETTLEMENTDATE,
+			'OFFERDATE' : self.OFFERDATE,
+			'VERSIONNO' : self.VERSIONNO,
+			'PARTICIPANTID' : self.PARTICIPANTID,
+			'DAILYENERGYCONSTRAINT' : self.DAILYENERGYCONSTRAINT,
+			'REBIDEXPLANATION' : self.REBIDEXPLANATION,
+			'PRICEBAND1' : self.PRICEBAND1,
+			'PRICEBAND2' : self.PRICEBAND2,
+			'PRICEBAND3' : self.PRICEBAND3,
+			'PRICEBAND4' : self.PRICEBAND4,
+			'PRICEBAND5' : self.PRICEBAND5,
+			'PRICEBAND6' : self.PRICEBAND6,
+			'PRICEBAND7' : self.PRICEBAND7,
+			'PRICEBAND8' : self.PRICEBAND8,
+			'PRICEBAND9' : self.PRICEBAND9,
+			'PRICEBAND10' : self.PRICEBAND10,
+			'MINIMUMLOAD' : self.MINIMUMLOAD,
+			'T1' : self.T1,
+			'T2' : self.T2,
+			'T3' : self.T3,
+			'T4' : self.T4,
+			'NORMALSTATUS' : self.NORMALSTATUS,
+			'LASTCHANGED' : self.LASTCHANGED,
+			'MR_FACTOR' : self.MR_FACTOR,
+			'ENTRYTYPE' : self.ENTRYTYPE,
+		}
+
 class BidPerOffer(Document):
 	
 	SETTLEMENTDATE = DateTimeField()

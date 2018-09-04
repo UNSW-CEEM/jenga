@@ -9,13 +9,13 @@ import hashlib
 import config
 from mongoengine.errors import NotUniqueError
 
-path = "data/PUBLIC_DVD_BIDPEROFFER_D_201806010000.CSV"
+period_offer_path = "data/PUBLIC_DVD_BIDPEROFFER_D_201806010000.CSV"
 
 
 
 print("Processing Bid Period Offers")
 # Process the second set of data - the period offers. 
-with open(path, 'rt') as f:
+with open(period_offer_path, 'rt') as f:
 	reader = csv.DictReader(islice(f,1,None), delimiter=',')
 	for row in reader:
 		

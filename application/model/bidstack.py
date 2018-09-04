@@ -1,4 +1,4 @@
-from bid_model import BidDayOffer, BidPerOffer
+from application.model.bid_model import BidDayOffer, BidPerOffer
 # import pymongo
 import config
 import pendulum
@@ -30,6 +30,7 @@ class Bid(EmbeddedDocument):
 		return prices[band]
 	
 	def get_volume(self, band):
+		
 		volumes = {
 			1: self.bid_period_offer.BANDAVAIL1,
 			2: self.bid_period_offer.BANDAVAIL2,
@@ -41,6 +42,7 @@ class Bid(EmbeddedDocument):
 			8: self.bid_period_offer.BANDAVAIL8,
 			9: self.bid_period_offer.BANDAVAIL9,
 		}
+		return volumes[band]
 
 		
 
@@ -59,44 +61,61 @@ class BidStack(Document):
 		"""Pass the constructor a python datetime object and a BidStack object will be constructed with the relevant data filled."""
 		
 		# Convert the datetime object to a pendulum object.
-		dt = pendulum.instance(self.trading_period)
+		dt = pendulum.instance(self.trading_period, tz=config.TZ)
 		
 		# HOW COOL IS THE NEM trading periods sensibly start at 4:30 am not midnight!
-		settlement_date = pendulum.instance(dt)
+		settlement_date = pendulum.instance(dt, tz=config.TZ)
 		if(settlement_date.hour <= 4 and settlement_date.minute != 0):
 			settlement_date = settlement_date.subtract(days=1)
 		settlement_date = settlement_date.start_of('day')
+
+		print("Settlement Date", settlement_date)
 		
 		# Find all relevant participant names
 		# unique_names = db['bid_day_offer'].find({'BIDTYPE':'ENERGY'}).distinct('DUID')
-		unique_names = BidDayOffer.objects(BIDTYPE='ENERGY').distinct('DUID')
+		unique_names = BidDayOffer.objects(BIDTYPE='ENERGY', SETTLEMENTDATE=settlement_date).distinct('DUID')
+		# unique_dates = BidDayOffer.objects(BIDTYPE='ENERGY').distinct('SETTLEMENTDATE')
+		# [print(date) for date in unique_dates]
+
 		# Loop through each bidder, get their day offer.
 		self.bid_day_offers = {}
 		self.bid_period_offers = {}
-		for name in unique_names:
-			
-			print ("Getting BidDayOffers", name)
-			search = BidDayOffer.objects(DUID=name, BIDTYPE='ENERGY', SETTLEMENTDATE=settlement_date).order_by('-BIDOFFERDATE')
-			if len(search) > 0:
-				# print('Found')
-				self.bid_day_offers[name] = search[0]
-				
+		
+
+		search = BidDayOffer.objects(BIDTYPE='ENERGY', SETTLEMENTDATE=settlement_date).order_by('-OFFERDATE')
+		for offer in search:
+			if offer.DUID not in self.bid_day_offers:
+				# print("Getting BidDayOffer", offer.DUID)
+				self.bid_day_offers[offer.DUID] = offer
+		
 		
 		# Loop through each bidder, get the set of volume bids.
-		for name in unique_names:
-			print ("Getting BidPerOffers", name)
-			search = BidPerOffer.objects(DUID=name, BIDTYPE='ENERGY', TRADINGPERIOD=dt).order_by('-BIDOFFERDATE')
-			if len(search) > 0:
-				self.bid_period_offers[name] = search[0]
-			# for obj in search:
-			# 	print(obj.BIDOFFERDATE, obj.PERIODID, obj.TRADINGPERIOD, obj.BIDSETTLEMENTDATE, obj.SETTLEMENTDATE,obj.BANDAVAIL1, obj.BANDAVAIL2, obj.BANDAVAIL3, obj.BANDAVAIL4, obj.BANDAVAIL5, obj.BANDAVAIL6, obj.BANDAVAIL7, obj.BANDAVAIL8, obj.BANDAVAIL9, obj.BANDAVAIL10,)
 		
+		search = BidPerOffer.objects(BIDTYPE='ENERGY', INTERVAL_DATETIME=dt)
+		for offer in search:
+			print(offer.DUID)
+			if offer.DUID in self.bid_day_offers:
+				print("Getting BidPerOffer", offer.DUID)
+				self.bid_period_offers[offer.DUID] = offer
+			
+			
 		# Loop through each participant and add the bid object. 
-		print("Creating bid objects.")
-		for name in unique_names:
-			if self.bid_period_offers[name] and self.bid_day_offers[name]:
-				self.bids[name] = Bid( self.bid_day_offers[name], self.bid_period_offers[name], name)
-				self.bids[name].save()
+		print("Creating bid objects NOW")
+		for name in self.bid_period_offers:
+			print('BID CREATION', name, self.bid_day_offers[name], self.bid_period_offers[name])
+			# try:
+			b = Bid( 
+				bid_day_offer=self.bid_day_offers[name], 
+				bid_period_offer= self.bid_period_offers[name], 
+				participant=name)
+			# b.save()
+			self.bids[name] = b
+				
+			# except AttributeError:
+				# print('BID CREATION FAILED', name, self.bid_day_offers[name], self.bid_period_offers[name])
+				# b = None
+				
+				# self.bids[name].save()
 		
 
 
@@ -107,6 +126,13 @@ class BidStack(Document):
 	def getBid(self, name):
 		"""Returns a bid object corresponding to a given participant"""
 		return self.bids[name]
+
+def bid_to_dict(bid):
+	bands = {}
+	for i in range(1,10):
+		bands[i] = {'price':bid.get_price(i), 'volume':bid.get_volume(i)}
+	return {'bands':bands}
+
 
 if __name__ == "__main__":
 	dt = pendulum.parse('2018-05-01 14:30:00.000', tz=None)

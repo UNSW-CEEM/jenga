@@ -2,10 +2,11 @@
 
 import csv
 from itertools import islice
-from bid_model import BidDayOffer, BidPerOffer
+from application.bid_model import BidDayOffer, BidPerOffer
 import pendulum
 import json
 import hashlib
+import config
 from mongoengine.errors import NotUniqueError
 
 path = "data/PUBLIC_DVD_BIDDAYOFFER_D_201806010000.CSV"
@@ -36,11 +37,11 @@ def run(path):
                     print ("Saving Bid Day Offer ", rowhash)
                     # Create the object
                     offer = BidDayOffer(
-                        SETTLEMENTDATE = row['SETTLEMENTDATE'],
+                        SETTLEMENTDATE = pendulum.parse(row['SETTLEMENTDATE'], tz=config.TZ),
                         DUID = row['DUID'],
                         BIDTYPE = row['BIDTYPE'],
-                        BIDSETTLEMENTDATE = row['BIDSETTLEMENTDATE'],
-                        OFFERDATE = row['OFFERDATE'],
+                        BIDSETTLEMENTDATE = pendulum.parse(row['BIDSETTLEMENTDATE'], tz=config.TZ),
+                        OFFERDATE = pendulum.parse(row['OFFERDATE'], tz=config.TZ),
                         VERSIONNO = row['VERSIONNO'],
                         PARTICIPANTID = row['PARTICIPANTID'],
                         DAILYENERGYCONSTRAINT = row['DAILYENERGYCONSTRAINT'],
@@ -61,7 +62,7 @@ def run(path):
                         T3 = row['T3'],
                         T4 = row['T4'],
                         NORMALSTATUS = row['NORMALSTATUS'],
-                        LASTCHANGED = row['LASTCHANGED'],
+                        LASTCHANGED = pendulum.parse(row['LASTCHANGED'], tz=config.TZ),
                         MR_FACTOR = row['MR_FACTOR'],
                         ENTRYTYPE = row['ENTRYTYPE'],
                         rowhash = rowhash
