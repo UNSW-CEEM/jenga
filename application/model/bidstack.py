@@ -133,6 +133,12 @@ def bid_to_dict(bid):
 		bands[i] = {'price':bid.get_price(i), 'volume':bid.get_volume(i)}
 	return {'bands':bands}
 
+def bid_to_list(bid):
+	bids = []
+	for i in range(1,10):
+		bids.append({'price':bid.get_price(i), 'volume':bid.get_volume(i), 'name': bid.bid_day_offer.DUID})
+	return bids
+
 
 if __name__ == "__main__":
 	dt = pendulum.parse('2018-05-01 14:30:00.000', tz=None)

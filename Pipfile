@@ -7,6 +7,7 @@ name = "pypi"
 mongoengine = "*"
 pendulum = "*"
 flask = "*"
+lazy = "*"
 
 [dev-packages]
 pylint = "*"

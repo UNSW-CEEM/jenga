@@ -6,6 +6,14 @@ h1 {
     /* background-color:red; */
 }
 
+.selectors{
+    display:flex;
+    flex-direction: row;
+    align-items: space-around;
+    justify-content: center;
+
+}
+
 #prices{
     width:100%;
     height:100%;
@@ -16,7 +24,7 @@ h1 {
     flex-direction:column;
     justify-content: center;
     align-items: center;
-    height:50vh !important;
+    height:99vh !important;
 }
 
 .price-chart .ct-point{
