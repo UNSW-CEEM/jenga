@@ -287,6 +287,8 @@ Vue.component('stack-explorer',{
                     data:data,
                 });
             }
+
+           
         
 
             Highcharts.chart('container', {
