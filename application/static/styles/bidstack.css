@@ -1,3 +1,10 @@
+@keyframes grow {
+    0%   {background-color: red;}
+    25%  {background-color: yellow;}
+    50%  {background-color: blue;}
+    100% {background-color: green;}
+  }
+
 .bidstack{
     display:flex;
     flex-direction:column;
@@ -17,6 +24,7 @@
     border-width:1px;
     border-color:grey;
     border-style: solid;
+    
 }
 
 .column{
@@ -27,6 +35,8 @@
     border-radius: 3px;
     border-color:white;
     cursor: pointer;
+    animation-name: grow;
+    animation-duration: 4s;
 }
 
 .stats-row{

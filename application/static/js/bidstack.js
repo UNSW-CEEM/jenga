@@ -16,7 +16,7 @@ Vue.component('bidstack',{
                 </div>
             </div>
 
-            <div class="stats-row">
+            <div class="stats-row" v-if="selected_bid.generator">
                 <div class="bid-stats">
                     <h3>{{selected_bid.generator}}</h3
                     <span>
