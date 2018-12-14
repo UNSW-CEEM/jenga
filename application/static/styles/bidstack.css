@@ -1,8 +1,11 @@
 @keyframes grow {
-    0%   {background-color: red;}
-    25%  {background-color: yellow;}
-    50%  {background-color: blue;}
-    100% {background-color: green;}
+    0%   {opacity:0;}
+    10%   {opacity:0.1;}
+    25%  {opacity:0.25;}
+    50%  {opacity:0.5;}
+    75%  {opacity:0.75;}
+    100% {opacity:1;}
+    
   }
 
 .bidstack{
@@ -36,7 +39,7 @@
     border-color:white;
     cursor: pointer;
     animation-name: grow;
-    animation-duration: 4s;
+    animation-duration: 1s;
 }
 
 .stats-row{
