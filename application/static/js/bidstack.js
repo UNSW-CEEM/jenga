@@ -12,6 +12,12 @@ Vue.component('bidstack',{
                     <option>TAS</option>
                 </select>
             <div class="columns">
+                <div class="y-axis-label">
+                <span>Y Top LABEL</span>
+                
+                <span>Y Bottom LABEL</span>
+                
+                </div>
                 <div class="column" v-for="(bid, index) in sorted_bidstack" v-on:click="select_bid(bid)" v-bind:style="{ height: get_height_percent(bid.price) + '%', width: get_width_percent(bid.volume) + '%', 'background-color':get_color(bid), transform:get_transform(bid.price)}">
                 </div>
             </div>
