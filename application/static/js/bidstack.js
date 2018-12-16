@@ -2,20 +2,29 @@
 Vue.component('bidstack',{
     template:`
         <div class="bidstack">
-            BIDSTACK
+            <div class="header-bar">
+            <span class="logo">JENGA | The NEM Bid Stack Explorer</span>
+
+            
+
             <select v-model="state">
-                    <option disabled value="">Please select one</option>
-                    <option>QLD</option>
-                    <option>NSW</option>
-                    <option>VIC</option>
-                    <option>SA</option>
-                    <option>TAS</option>
-                </select>
+                <option disabled value="">Please select one</option>
+                <option>QLD</option>
+                <option>NSW</option>
+                <option>VIC</option>
+                <option>SA</option>
+                <option>TAS</option>
+            </select>
+            
+            </div>
+            <div class="ct-chart price" id="spotprices"></div>
+            
+            
             <div class="columns">
                 <div class="y-axis-label">
-                <span>Y Top LABEL</span>
+                <span>Max</span>
                 
-                <span>Y Bottom LABEL</span>
+                <span>Min</span>
                 
                 </div>
                 <div class="column" v-for="(bid, index) in sorted_bidstack" v-on:click="select_bid(bid)" v-bind:style="{ height: get_height_percent(bid.price) + '%', width: get_width_percent(bid.volume) + '%', 'background-color':get_color(bid), transform:get_transform(bid.price)}">
@@ -67,6 +76,7 @@ Vue.component('bidstack',{
         state(){
             console.log('state changed to ', this.state);
             this.select_bidstack(this.date_iso)
+            this.drawSpot();
         }
     },
     computed:{
@@ -225,9 +235,138 @@ Vue.component('bidstack',{
            
         
 
+        },
+
+        drawSpot(){
+            var self = this;
+            $.getJSON('/spotprices/'+this.state+'/'+this.dates[0]+'/'+this.dates[this.dates.length-1], function(result){
+                console.log('Prices', result);
+                // var data = {
+                //     // A labels array that can contain any sort of values
+                //     // labels: result.spot.dates,
+                //     // Our series array that contains series objects or in this case series data arrays
+                //     series: [
+                //       result.spot.prices
+                //     ]
+                //   };
+                  
+                  // Create a new line chart object where as first parameter we pass in a selector
+                  // that is resolving to our chart container element. The Second parameter
+                  // is the actual data object.
+                //   new Chartist.Line('.ct-chart', data);
+
+                  Highcharts.chart('spotprices', {
+                    chart: {
+                        zoomType: 'xy'
+                    },
+                    title: {
+                        text: self.state+" Spot Prices"
+                    },
+                    // subtitle: {
+                    //     text: document.ontouchstart === undefined ?
+                    //             'Click and drag in the plot area to zoom in' : 'Pinch the chart to zoom in'
+                    // },
+                    xAxis: {
+                        type: 'datetime',
+                    },
+                    yAxis: [{
+                        title: {
+                            text: 'Price $/MWh'
+                        }
+                    },
+                    // {
+                    //     title: {
+                    //         text: 'Demand MW'
+                    //     },
+                    //     opposite:true,
+                    // }
+                ],
+                    tooltip: {
+                        positioner: function() {
+                            return {
+                              x: this.chart.plotLeft,
+                              y: this.chart.plotTop - 55,
+                            };
+                          },
+                        shared:true,
+                    },
+                    legend: {
+                        layout: 'vertical',
+                        align: 'right',
+                        x: -150,
+                        verticalAlign: 'top',
+                        y: 0,
+                        floating: true,
+                        backgroundColor: (Highcharts.theme && Highcharts.theme.legendBackgroundColor) || '#FFFFFF'
+                    },
+                    // resetZoomButton: {
+                    //     position: {
+                    //         // align: 'right', // by default
+                    //         // verticalAlign: 'bottom', // by default
+                    //         x: -200,
+                    //         y: 0,
+                    //     }
+                    // },
+                    plotOptions: {
+                        series:{
+                            cursor: 'pointer',
+                            point: {
+                                events: {
+                                    click: function () {
+                                        // alert('Category: ' + this.category + ', value: ' + this.y);
+                                        self.select_bidstack(this.category/1000);
+                                    }
+                                }
+                            }
+                        },
+                        area: {
+                            fillColor: {
+                                linearGradient: {
+                                    x1: 0,
+                                    y1: 0,
+                                    x2: 0,
+                                    y2: 1
+                                },
+                                stops: [
+                                    [0, Highcharts.getOptions().colors[0]],
+                                    [1, Highcharts.Color(Highcharts.getOptions().colors[0]).setOpacity(0).get('rgba')]
+                                ]
+                            },
+                            marker: {
+                                radius: 2
+                            },
+                            lineWidth: 1,
+                            states: {
+                                hover: {
+                                    lineWidth: 1
+                                }
+                            },
+                            threshold: null
+                        }
+                    },
+        
+                    series: [
+                        {
+                            type: 'area',
+                            name: 'Spot Price',
+                            yaxis: 1,
+                            data: result.spot.prices
+                        },
+                        
+                        // {
+                        //     type: 'line',
+                        //     name: 'Demand',
+                        //     yaxis: 2,
+                        //     data: result.demand.demand
+                        // }
+                    ]
+                });
+          });
         }
     },
     mounted(){
+       
+
         var self = this;
         $.getJSON('/bidstack/dates', function(response){
             console.log('dates', response);
@@ -235,6 +374,8 @@ Vue.component('bidstack',{
                 self.dates.push(response[i]);
             }
             self.select_bidstack(self.dates[0]);
+            self.drawSpot();
+            
         });
     }
 })

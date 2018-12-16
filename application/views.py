@@ -143,3 +143,29 @@ def prices(region, start_isodate, end_isodate):
                 },
             }
         )
+
+
+@app.route('/spotprices/<region>/<start_isodate>/<end_isodate>')
+def spotprices(region, start_isodate, end_isodate):
+    start_date = pendulum.from_timestamp(int(start_isodate), tz=config.TZ)
+    end_date = pendulum.from_timestamp(int(end_isodate), tz=config.TZ)
+    print(start_date, end_date)
+   
+    search = Price.objects(date_time__gte=start_date, date_time__lte=end_date, region=region.upper(), price_type='AEMO_SPOT').order_by('date_time')
+    result = [p for p in search]
+
+    demand_search = Demand.objects(date_time__gte=start_date, date_time__lte=end_date, region=region.upper()).order_by('date_time')
+    demand_result = [p for p in demand_search]
+
+    
+    return jsonify({
+                'spot':{
+                    # 'dates':[ p.date_time for p in result],
+                    'prices':[ [pendulum.instance(p.date_time).timestamp() * 1000, p.price] for p in result]
+                },
+                'demand':{
+                    # 'dates':[ p.date_time for p in demand_result],
+                    'demand':[ [pendulum.instance(p.date_time).timestamp() * 1000, p.demand] for p in demand_result]
+                },
+            }
+        )
