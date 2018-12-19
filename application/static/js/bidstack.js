@@ -34,6 +34,12 @@ Vue.component('bidstack',{
             <div class="stats-row" >
                 <div class="filters">
                     <span class="title">Bidstack Filters</span>
+
+                    <div class="fuel_source_primary_filter">
+                        <div v-for="property in filters['fuel_source_primary']" v-on:click="toggle_filter('fuel_source_primary',property)" v-bind:class="{ 'filter-on': is_filtered('fuel_source_primary',property),'filter-off': !is_filtered('fuel_source_primary',property) }">
+                            {{property}} 
+                        </div>
+                    </div>
                 </div>
                 <div class="bid-stats" v-if="selected_bid.generator">
 
@@ -68,6 +74,14 @@ Vue.component('bidstack',{
         return{
             dates:[],
             bidstack : [],
+            saved_bidstacks:{
+                'QLD':{},
+                'NSW':{},
+                'VIC':{},
+                'SA':{},
+                'TAS':{},
+                'ALL':{},
+            },
             mode:'generator',
             state:'NSW',
             date_iso:0,
@@ -78,7 +92,14 @@ Vue.component('bidstack',{
             chart_price_floor:-10000,
             selected_bid:{},
             sorted_bidstack:[],
-            colors:{}
+            colors:{},
+            filters:{
+                'fuel_source_primary':[],
+            },
+
+            selected_filters:{
+
+            }
         }
     },
     watch:{
@@ -86,7 +107,8 @@ Vue.component('bidstack',{
             console.log('state changed to ', this.state);
             this.select_bidstack(this.date_iso)
             this.drawSpot();
-        }
+        },
+        
     },
     computed:{
         selected_bid_marginal_benefit_curve(){
@@ -110,6 +132,58 @@ Vue.component('bidstack',{
         
     },
     methods:{
+        toggle_filter(param, value){
+            console.log('Toggling filter for ',param, value)
+            if(this.is_filtered(param, value)){
+                this.remove_filter(param, value);
+            }else{
+                this.add_filter(param, value);
+            }
+            
+            this.draw_bidstack();
+        },
+
+        is_filtered(param, value){
+            if(this.selected_filters[param]==null){
+                return false;
+            }
+            for(var i = 0; i< this.selected_filters[param].length; i++){
+                if(this.selected_filters[param][i] == value){
+                    return true;
+                }
+            }
+            return false;
+        },
+
+        add_filter(param, value){
+            console.log('Adding filter', param, value)
+            if(this.selected_filters[param]==null){
+                this.selected_filters[param] = [];
+            }
+            this.selected_filters[param].push(value);
+        },
+        remove_filter(param, value){
+            console.log('Removing filter', param, value)
+            var remaining_filters = [];
+            for(var i = 0; i< this.selected_filters[param].length; i++){
+                if(this.selected_filters[param][i] != value){
+                    remaining_filters.push(this.selected_filters[param][i]);
+                }
+            }
+            this.selected_filters[param] = remaining_filters;
+        },
+
+        
+
+        apply_filters(){
+            console.log('Selected filters changed.');
+            var new_sorted_bidstack = [];
+            for(var i = 0; i< this.sorted_bidstack.length; i++){
+                var bid = this.sorted_bidstack[i];
+                
+            }
+            this.sorted_bidstack = new_sorted_bidstack;
+        },
 
         reset_bidstack(){
             this.sorted_bidstack = [];
@@ -189,60 +263,89 @@ Vue.component('bidstack',{
             this.date_iso = date_iso;
             this.reset_bidstack();
             var self = this;
-            $.getJSON('/bidstack/'+this.state+'/'+date_iso, function(response){
-                console.log('bidstack', response);
-                self.bidstack = response;
-                self.draw_chart();
-            });
+            if(this.saved_bidstacks[this.state][this.date_iso] == null){
+                $.getJSON('/bidstack/'+this.state+'/'+date_iso, function(response){
+                    console.log('bidstack', response);
+                    
+                    self.saved_bidstacks[self.state][self.date_iso] = response;
+                    for(var key in response){
+                        
+                        for(var filter in self.filters){
+                            var option = response[key].meta[filter];
+                            if(self.filters[filter].indexOf(option) < 0){
+                                self.filters[filter].push(option)
+                            }
+                            
+                        }
+                    }
+
+                    self.draw_bidstack();
+                });
+            }else{
+                self.draw_bidstack();
+            }
+            
 
         },
 
         select_bid(bid){
             this.selected_bid = bid;
         },
-        draw_chart(){
+        draw_bidstack(){
+            this.reset_bidstack();
 
-            
             //Assemble data
             var sorted_bidstack = [];
-
-            for(var name in this.bidstack){
+            var original_bidstack = this.saved_bidstacks[this.state][this.date_iso];
+            for(var name in original_bidstack){
+                var bid = original_bidstack[name];
                 var data = [];
-                for(var band in this.bidstack[name].bands){
-                    if(this.bidstack[name].bands[band].volume > 0){
-                        
-                        sorted_bidstack.push({
-                            'generator':name,
-                            'volume':this.bidstack[name].bands[band].volume,
-                            'price':this.bidstack[name].bands[band].price,
-                            'meta':this.bidstack[name].meta,
-                        })
-                        
-                        this.total_volume += this.bidstack[name].bands[band].volume
-
-                        if(this.bidstack[name].bands[band].price > this.max_price){
-                            this.max_price = this.bidstack[name].bands[band].price;
+                //Check filters
+                var include = true;
+                for(var property_type in this.selected_filters){
+                    
+                    for(var j=0; j< this.selected_filters[property_type].length; j++){
+                        var property = this.selected_filters[property_type][j];
+                        if(bid.meta[property_type] == property){
+                            include = false;
                         }
+                    }
+                    
+                }
+                //If it hasnt been filtered, add it to the sorted bidstack.
+                if(include){
 
-                        if(this.bidstack[name].bands[band].price < this.min_price){
-                            this.min_price = this.bidstack[name].bands[band].price;
+                    for(var band in original_bidstack[name].bands){
+                        if(original_bidstack[name].bands[band].volume > 0){
+                            
+                            sorted_bidstack.push({
+                                'generator':name,
+                                'volume':original_bidstack[name].bands[band].volume,
+                                'price':original_bidstack[name].bands[band].price,
+                                'meta':original_bidstack[name].meta,
+                            })
+                            
+                            this.total_volume += original_bidstack[name].bands[band].volume
+
+                            if(original_bidstack[name].bands[band].price > this.max_price){
+                                this.max_price = original_bidstack[name].bands[band].price;
+                            }
+
+                            if(original_bidstack[name].bands[band].price < this.min_price){
+                                this.min_price = original_bidstack[name].bands[band].price;
+                            }
+                            
                         }
-                        
                     }
                 }
                 
             }
-
+            //Sort the sorted bidstack.
             sorted_bidstack.sort(function(a, b){
                 return a.price - b.price;
             });
-
+            //set the variable globally. Bidstack will be drawn via html v-for.
             this.sorted_bidstack = sorted_bidstack;
-
-
-            
-
-           
         
 
         },

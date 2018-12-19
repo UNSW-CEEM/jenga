@@ -86,6 +86,14 @@
     align-items: center;
 }
 
+.filter-on{
+    background-color:red;
+}
+
+.filter-off{
+    /* background-color:green; */
+}
+
 
 
 .bid-stats{

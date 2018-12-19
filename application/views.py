@@ -28,7 +28,7 @@ def bids(isodate):
 def bid_stack(state, isodate):
     state = state.upper()
     participant_meta = participant_service.participant_metadata
-    print(participant_meta)
+    
     if state != "ALL":
         participants_in_state = [p for p in participant_meta if participant_meta[p]['state'] == state ]
     else:
