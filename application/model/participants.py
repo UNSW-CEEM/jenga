@@ -35,5 +35,14 @@ class ParticipantService(object):
         for p in search:
             participants[p.DUID] = {
                 'state':p.state,
+                'fuel_source_primary':p.fuel_source_primary,
+                'fuel_source_descriptor':p.fuel_source_descriptor,
+                'technology_type_primary':p.technology_type_primary,
+                'technology_type_descriptor':p.technology_type_descriptor,
+                'unit_size_MW':p.unit_size_MW,
+                'reg_cap_MW':p.reg_cap_MW,
+                'max_ROC_per_min':p.max_ROC_per_min,
+                'label':p.label,
+                'station_name':p.station_name,
             }
         return participants

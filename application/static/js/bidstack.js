@@ -31,9 +31,19 @@ Vue.component('bidstack',{
                 </div>
             </div>
 
-            <div class="stats-row" v-if="selected_bid.generator">
-                <div class="bid-stats">
-                    <h3>{{selected_bid.generator}}</h3
+            <div class="stats-row" >
+                <div class="filters">
+                    <span class="title">Bidstack Filters</span>
+                </div>
+                <div class="bid-stats" v-if="selected_bid.generator">
+
+                    <span class="title">{{selected_bid.meta.station_name}}</span>
+                    <span class="duid">{{selected_bid.generator}}</span>
+                    <span class="description">{{selected_bid.meta.label}}</span>
+                    <span class="description">{{selected_bid.meta.fuel_source_primary}} | {{selected_bid.meta.fuel_source_descriptor}} </span>
+                    <span class="description">{{selected_bid.meta.technology_type_primary}} | {{selected_bid.meta.technology_type_descriptor}} </span>
+                    
+
                     <span>
                         Bid Price: $ {{selected_bid.price}} / MWh
                     </span>
@@ -44,7 +54,7 @@ Vue.component('bidstack',{
                    
                 </div>
 
-                <div class="marginal-benefit">
+                <div class="marginal-benefit" v-if="selected_bid.generator">
                 
                     <div class="column" v-for="(bid, index) in selected_bid_marginal_benefit_curve" v-on:click="select_bid(bid)" v-bind:style="{ height: get_height_percent(bid.price) + '%', width: get_marginal_benefit_width_percent(bid.volume) + '%', transform:get_transform(bid.price)}">
                     </div>
@@ -67,7 +77,6 @@ Vue.component('bidstack',{
             chart_price_cap:14000,
             chart_price_floor:-10000,
             selected_bid:{},
-            
             sorted_bidstack:[],
             colors:{}
         }
@@ -103,7 +112,7 @@ Vue.component('bidstack',{
     methods:{
 
         reset_bidstack(){
-            this.sorted_bidstack = 0;
+            this.sorted_bidstack = [];
             this.total_volume = 0;
             this.max_price = 0;
             this.min_price = 0;
@@ -206,6 +215,7 @@ Vue.component('bidstack',{
                             'generator':name,
                             'volume':this.bidstack[name].bands[band].volume,
                             'price':this.bidstack[name].bands[band].price,
+                            'meta':this.bidstack[name].meta,
                         })
                         
                         this.total_volume += this.bidstack[name].bands[band].volume

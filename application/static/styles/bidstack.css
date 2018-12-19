@@ -71,19 +71,47 @@
     /* background-color:blue; */
     display:flex;
     flex-direction:row;
-    justify-content:space-around;
+    justify-content:flex-start;
 }
+
+.filters{
+    border-style: solid;
+    border-color:grey;
+    border-width:1px;
+    margin: 0 1vw 0 1vw;
+    min-width:30vw;
+    display:flex;
+    flex-direction: column;
+    justify-content:flex-start;
+    align-items: center;
+}
+
+
 
 .bid-stats{
     border-style: solid;
     border-color:grey;
     border-width:1px;
     margin: 0 1vw 0 1vw;
-    min-width:20vw;
+    min-width:22vw;
     display:flex;
     flex-direction: column;
-    justify-content:space-around;
+    justify-content:flex-start;
     align-items: center;
+}
+
+.bid-stats .title{
+    font-weight: bold;
+}
+
+.bid-stats .duid{
+    font-weight: bold;
+    font-size: 0.6em;
+}
+
+.bid-stats .description{
+    
+    font-size: 0.6em;
 }
 
 .marginal-benefit{
@@ -96,6 +124,7 @@
     /* margin: 1vh 1vw 0 1vw; */
     height:15vh;
     padding-bottom:15vh;
+    margin: 0 1vw 0 1vw;
     
     border-width:1px;
     border-color:grey;
