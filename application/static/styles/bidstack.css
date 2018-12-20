@@ -39,6 +39,7 @@
     border-width: 1px;
     border-color:grey;
     margin: 5vh 2vw 1vh 2vw;
+    background-color:#ffffff;
 }
 
 .bidstack{
@@ -46,6 +47,7 @@
     flex-direction:column;
     justify-content:center;
     align-items:center;
+    
 }
 
 .columns{
@@ -63,6 +65,7 @@
     border-style: solid;
     border-radius:5px;
     margin:0 2vw 0 2vw;
+    background-color:#ffffff;
     
 }
 
@@ -100,6 +103,7 @@
     flex-direction: column;
     justify-content:flex-start;
     align-items: center;
+    background-color:#ffffff;
 
 }
 
@@ -141,6 +145,7 @@
     flex-direction: column;
     justify-content:flex-start;
     align-items: center;
+    background-color:#ffffff;
 }
 
 .bid-stats .title{
@@ -175,6 +180,7 @@
     border-style: solid;
 
     border-radius:5px;
+    background-color:#ffffff;
 }
 
 .marginal-benefit-curve{
