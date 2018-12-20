@@ -81,7 +81,8 @@ Vue.component('bidstack',{
                         <span v-if="marginal_benefit_mode=='company'">{{selected_bid.meta.label}} | Cumulative Marginal Benefit Curve </span>
                         <span v-if="marginal_benefit_mode=='generator'">{{selected_bid.meta.station_name}} | Marginal Benefit Curve </span>
                     </div>
-                    <div class="column" v-for="(bid, index) in selected_bid_marginal_benefit_curve" v-on:click="select_bid(bid)" v-bind:style="{ height: get_height_percent(bid.price) + '%', width: get_marginal_benefit_width_percent(bid.volume) + '%', transform:get_transform(bid.price)}">
+                    <div class="marginal-benefit-curve">
+                        <div class="column" v-for="(bid, index) in selected_bid_marginal_benefit_curve" v-on:click="select_bid(bid)" v-bind:style="{ height: get_height_percent(bid.price) + '%', width: get_marginal_benefit_width_percent(bid.volume) + '%', transform:get_transform(bid.price)}"></div>
                     </div>
                 </div>
                 <div class="marginal-benefit" v-else >
