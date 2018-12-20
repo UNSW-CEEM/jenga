@@ -3,20 +3,27 @@ Vue.component('bidstack',{
     template:`
         <div class="bidstack">
             <div class="header-bar">
-            <span class="logo">JENGA | The NEM Bid Stack Explorer</span>
+                <span class="logo">JENGA | The NEM Bid Stack Explorer</span>
+                <span class="selected-date">
+                    <span class="timeshift_button" v-on:click="shift_time(-30)"> << </span>
+                        {{date_to_str(date_iso)}}
+                    <span class="timeshift_button" v-on:click="shift_time(30)"> >> </span>
+                
+                </span>
 
-            
-
-            <select v-model="state">
-                <option disabled value="">Please select one</option>
-                <option>QLD</option>
-                <option>NSW</option>
-                <option>VIC</option>
-                <option>SA</option>
-                <option>TAS</option>
-            </select>
+                <select v-model="state">
+                    <option disabled value="">Please select one</option>
+                    <option>ALL</option>
+                    <option>QLD</option>
+                    <option>NSW</option>
+                    <option>VIC</option>
+                    <option>SA</option>
+                    <option>TAS</option>
+                </select>
             
             </div>
+            
+
             <div class="ct-chart price" id="spotprices"></div>
             
             
@@ -36,11 +43,13 @@ Vue.component('bidstack',{
                     <span class="title">Bidstack Filters</span>
 
                     <div class="fuel_source_primary_filter">
-                        <div v-for="property in filters['fuel_source_primary']" v-on:click="toggle_filter('fuel_source_primary',property)" v-bind:class="{ 'filter-on': is_filtered('fuel_source_primary',property),'filter-off': !is_filtered('fuel_source_primary',property) }">
+                        <span class="filter-label">Primary Fuel Source</span>
+                        <div class="filter-option" v-for="property in filters['fuel_source_primary']" v-on:click="toggle_filter('fuel_source_primary',property)" v-bind:class="{ 'filter-on': is_filtered('fuel_source_primary',property),'filter-off': !is_filtered('fuel_source_primary',property) }">
                             {{property}} 
                         </div>
                     </div>
                 </div>
+
                 <div class="bid-stats" v-if="selected_bid.generator">
 
                     <span class="title">{{selected_bid.meta.station_name}}</span>
@@ -59,11 +68,24 @@ Vue.component('bidstack',{
                     </span>
                    
                 </div>
+                <div class="bid-stats" v-else >
+                    <span class="placeholder">No Bid Selected</span>
+                </div>
 
                 <div class="marginal-benefit" v-if="selected_bid.generator">
-                
+                    <div class="marginal-benefit-header">
+                        <div class="select-marginal-benefit-mode">
+                            <div class="select-marginal-benefit-mode-button" v-bind:class="{selected: marginal_benefit_mode=='company'}" v-on:click="select_marginal_benefit_mode('company')" >Company</div>    
+                            <div class="select-marginal-benefit-mode-button" v-bind:class="{selected: marginal_benefit_mode=='generator'}" v-on:click="select_marginal_benefit_mode('generator')">Generator</div>
+                        </div>
+                        <span v-if="marginal_benefit_mode=='company'">{{selected_bid.meta.label}} | Cumulative Marginal Benefit Curve </span>
+                        <span v-if="marginal_benefit_mode=='generator'">{{selected_bid.meta.station_name}} | Marginal Benefit Curve </span>
+                    </div>
                     <div class="column" v-for="(bid, index) in selected_bid_marginal_benefit_curve" v-on:click="select_bid(bid)" v-bind:style="{ height: get_height_percent(bid.price) + '%', width: get_marginal_benefit_width_percent(bid.volume) + '%', transform:get_transform(bid.price)}">
                     </div>
+                </div>
+                <div class="marginal-benefit" v-else >
+                    <span class="placeholder"> No Bid Selected </span>
                 </div>
 
             </div>
@@ -90,13 +112,16 @@ Vue.component('bidstack',{
             max_price:0,
             chart_price_cap:14000,
             chart_price_floor:-10000,
-            selected_bid:{},
+            selected_bid:{meta:{}},
             sorted_bidstack:[],
             colors:{},
             filters:{
                 'fuel_source_primary':[],
             },
 
+            marginal_benefit_mode:'company',
+            // marginal_benefit_mode:'generator',
+    
             selected_filters:{
 
             }
@@ -114,8 +139,14 @@ Vue.component('bidstack',{
         selected_bid_marginal_benefit_curve(){
             var selected_bid_marginal_benefit_curve = [];
             for(var i = 0; i< this.sorted_bidstack.length; i++){
-                if(this.sorted_bidstack[i].generator == this.selected_bid.generator){
-                    selected_bid_marginal_benefit_curve.push(this.sorted_bidstack[i]);
+                if(this.marginal_benefit_mode=='generator'){
+                    if(this.sorted_bidstack[i].meta.station_name == this.selected_bid.meta.station_name){
+                        selected_bid_marginal_benefit_curve.push(this.sorted_bidstack[i]);
+                    }
+                }else if(this.marginal_benefit_mode=='company'){
+                    if(this.sorted_bidstack[i].meta.label == this.selected_bid.meta.label){
+                        selected_bid_marginal_benefit_curve.push(this.sorted_bidstack[i]);
+                    }
                 }
             }
             return selected_bid_marginal_benefit_curve;
@@ -132,6 +163,15 @@ Vue.component('bidstack',{
         
     },
     methods:{
+        select_marginal_benefit_mode(mode){
+            console.log('Selecting marginal benefit mode', mode);
+            this.marginal_benefit_mode = mode;
+        },
+        shift_time(minutes){
+            console.log('Shifting time by',minutes, 'minutes')
+            var new_date_iso = moment.unix(this.date_iso).add(minutes,'minutes').unix();
+            this.select_bidstack(new_date_iso);
+        },
         toggle_filter(param, value){
             console.log('Toggling filter for ',param, value)
             if(this.is_filtered(param, value)){
@@ -234,23 +274,32 @@ Vue.component('bidstack',{
 
 
         get_color(bid){
-            var my_palette = ["ffb3ba", "ffdfba", "ffffba", "baffc9", "bae1ff"];
-            my_palette.push.apply(my_palette,palette('mpn65', 15) );
+            // var my_palette = ["ffb3ba", "ffdfba", "ffffba", "baffc9", "bae1ff"];
+            // my_palette.push.apply(my_palette,palette('mpn65', 15) );
 
             
 
-            // var my_palette = palette('mpn65', 15);
-            index = Math.floor(Math.random() * my_palette.length);
+            // // var my_palette = palette('mpn65', 15);
+            // index = Math.floor(Math.random() * my_palette.length);
             
-            if(!this.colors[bid.generator]){
-                this.colors[bid.generator] = my_palette[index];
+            // if(!this.colors[bid.generator]){
+            //     this.colors[bid.generator] = my_palette[index];
+            // }
+            // color = this.colors[bid.generator];
+            var colorHashObj =  new ColorHash();
+            
+            var colorHash = colorHashObj.rgb(bid.meta.label);
+            // console.log('Color hash test',colorHash)
+
+            var color = ""
+            for(var i = 0; i< colorHash.length; i++){
+                color += colorHash[i].toString(16);
             }
-            color = this.colors[bid.generator];
-
-            if(bid.generator == this.selected_bid.generator){
+            
+            if(bid.meta.label == this.selected_bid.meta.label){
                 color = "000000";
             }
-            
+
             return "#"+color
         },
 
@@ -272,6 +321,12 @@ Vue.component('bidstack',{
                         
                         for(var filter in self.filters){
                             var option = response[key].meta[filter];
+                            //Check if its an empty string or nonsensical
+                            if (!option.match(/[a-z]/i)) {
+                                option="Other"
+                                response[key].meta[filter] = option;
+                            }
+
                             if(self.filters[filter].indexOf(option) < 0){
                                 self.filters[filter].push(option)
                             }
@@ -354,6 +409,7 @@ Vue.component('bidstack',{
             var self = this;
             $.getJSON('/spotprices/'+this.state+'/'+this.dates[0]+'/'+this.dates[this.dates.length-1], function(result){
                 console.log('Prices', result);
+
                 // var data = {
                 //     // A labels array that can contain any sort of values
                 //     // labels: result.spot.dates,
@@ -367,6 +423,19 @@ Vue.component('bidstack',{
                   // that is resolving to our chart container element. The Second parameter
                   // is the actual data object.
                 //   new Chartist.Line('.ct-chart', data);
+                var series = [];
+                for(var state in result){
+                    console.log(state)
+                    series.push(
+                        {
+                            type: 'line',
+                            name: state+' Spot Price',
+                            yaxis: 1,
+                            data: result[state].spot.prices
+                        },
+                    )
+                }
+               
 
                   Highcharts.chart('spotprices', {
                     chart: {
@@ -458,21 +527,7 @@ Vue.component('bidstack',{
                         }
                     },
         
-                    series: [
-                        {
-                            type: 'area',
-                            name: 'Spot Price',
-                            yaxis: 1,
-                            data: result.spot.prices
-                        },
-                        
-                        // {
-                        //     type: 'line',
-                        //     name: 'Demand',
-                        //     yaxis: 2,
-                        //     data: result.demand.demand
-                        // }
-                    ]
+                    series: series,
                 });
           });
         }
@@ -482,13 +537,14 @@ Vue.component('bidstack',{
 
         var self = this;
         $.getJSON('/bidstack/dates', function(response){
+            
             console.log('dates', response);
+            
             for(var i = 0; i<response.length; i++){
                 self.dates.push(response[i]);
             }
             self.select_bidstack(self.dates[0]);
             self.drawSpot();
-            
         });
     }
 })
