@@ -309,7 +309,7 @@ Vue.component('bidstack',{
         },
 
         select_bidstack(date_iso){
-            console.log('Selecting bidstack', date_iso);
+            console.log('Selecting bidstack', date_iso, moment.unix(date_iso).format());
             this.date_iso = date_iso;
             this.reset_bidstack();
             var self = this;

@@ -51,7 +51,6 @@ def bid_stack(state, isodate):
     except DoesNotExist:
         print("Couldn't find stack")
         return jsonify({'message':'None found.'})
-        
 
 @app.route('/bidstack/dates')
 def bid_stack_dates():

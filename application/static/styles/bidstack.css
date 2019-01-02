@@ -59,6 +59,7 @@
     /* Change this to baseline when you figure it out. */
     min-width:100%;
     min-height:30vh;
+    height:30vh;
     padding-bottom:30vh;
     border-width:1px;
     border-color:grey;

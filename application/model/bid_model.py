@@ -1,6 +1,8 @@
 from mongoengine import *
 import config
-connect(config.db_name)
+
+
+connect(config.DB_NAME, host=config.MONGO_HOST,username=config.MONGO_USER, password=config.MONGO_PASSWORD, authentication_source=config.MONGO_AUTH_SOURCE)
 
 class BidDayOffer(Document):
 	SETTLEMENTDATE = DateTimeField()

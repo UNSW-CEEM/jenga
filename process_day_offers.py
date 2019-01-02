@@ -2,7 +2,7 @@
 
 import csv
 from itertools import islice
-from application.bid_model import BidDayOffer, BidPerOffer
+from application.model.bid_model import BidDayOffer, BidPerOffer
 import pendulum
 import json
 import hashlib
@@ -13,7 +13,7 @@ path = "data/PUBLIC_DVD_BIDDAYOFFER_D_201806010000.CSV"
 
 # AEMO's CSV files are actually two csv files in one! lucky us. 
 # We need to find where the split is so we can use different headings etc.
-def run(path):
+def process(path):
     print("Processing Bid Day Offers")
     # Process the first set of data - the daily offers.
     # Daily offers are where the bidder sets the prices of their price bands and a few other predicted params
@@ -75,4 +75,4 @@ def run(path):
 
 
 if __name__ == "__main__":
-    run(path)
+    process(path)

@@ -8,6 +8,8 @@ mongoengine = "*"
 pendulum = "*"
 flask = "*"
 lazy = "*"
+nemosis = "*"
+dnspython = "*"
 
 [dev-packages]
 pylint = "*"
