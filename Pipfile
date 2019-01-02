@@ -10,6 +10,7 @@ flask = "*"
 lazy = "*"
 nemosis = "*"
 dnspython = "*"
+gunicorn = "*"
 
 [dev-packages]
 pylint = "*"
