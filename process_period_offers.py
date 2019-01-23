@@ -9,7 +9,7 @@ import hashlib
 import config
 from mongoengine.errors import NotUniqueError
 
-path = "data/PUBLIC_DVD_BIDPEROFFER_D_201806010000.CSV"
+
 
 
 
@@ -68,4 +68,5 @@ def process(path):
 					pass
 
 if __name__ == "__main__":
+	path = "data/PUBLIC_DVD_BIDPEROFFER_D_201806010000.CSV"
 	process(path)
