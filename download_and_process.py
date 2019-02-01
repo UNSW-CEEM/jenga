@@ -27,6 +27,7 @@ def run_period_offers(year, month):
         data_fetch_methods.dynamic_data_compiler(start_time, end_time, table, os.path.join(raw_data_cache, 'BIDPEROFFER_D'))
     # Load the file into the database
     if not processed_files.check_processed(expected_fname):
+        print("Processing Period Offer", year, month)
         process_period_offers.process(os.path.join(raw_data_cache,'BIDPEROFFER_D',expected_fname))
         processed_files.set_processed(expected_fname)
 
@@ -44,6 +45,7 @@ def run_day_offers(year, month):
         data_fetch_methods.dynamic_data_compiler(start_time, end_time, table, os.path.join(raw_data_cache, 'BIDDAYOFFER_D'))
     # Load the file into the database
     if not processed_files.check_processed(expected_fname):
+        print("Processing Day Offer", year, month)
         process_day_offers.process(os.path.join(raw_data_cache,'BIDDAYOFFER_D',expected_fname))
         processed_files.set_processed(expected_fname)
 

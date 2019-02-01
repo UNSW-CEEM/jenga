@@ -29,7 +29,7 @@ def process(path):
 				for key in row:
 					row[key] = None if row[key] == "" else row[key]
 				try:
-					print("Saving Bid Period Offer ",rowhash)
+					print("Saving Bid Period Offer ",rowhash, path)
 					bid = BidPerOffer(
 						SETTLEMENTDATE = pendulum.parse(row['SETTLEMENTDATE'], tz=config.TZ),
 						DUID = row['DUID'],

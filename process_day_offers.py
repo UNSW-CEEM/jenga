@@ -34,7 +34,7 @@ def process(path):
                     row[key] = None if row[key] == "" else row[key]
                 # If the bid isn't currently in the dataset
                 try:
-                    print ("Saving Bid Day Offer ", rowhash)
+                    print ("Saving Bid Day Offer ", rowhash, path)
                     # Create the object
                     offer = BidDayOffer(
                         SETTLEMENTDATE = pendulum.parse(row['SETTLEMENTDATE'], tz=config.TZ),
