@@ -1,6 +1,6 @@
 from mongoengine import *
 
 class Demand(Document):
-    date_time = DateTimeField()
+    date_time = DateTimeField(indexed=True)
     demand = FloatField()
-    region = StringField()
+    region = StringField(indexed=True)

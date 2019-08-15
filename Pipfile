@@ -11,6 +11,12 @@ lazy = "*"
 nemosis = "*"
 dnspython = "*"
 gunicorn = "*"
+seaborn = "*"
+bokeh = "*"
+palettable = "*"
+strsim = "*"
+scipy = "*"
+opennempy = "*"
 
 [dev-packages]
 pylint = "*"

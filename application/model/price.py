@@ -1,9 +1,9 @@
 from mongoengine import *
 
 class Price(Document):
-    date_time = DateTimeField()
+    date_time = DateTimeField(indexed=True)
     price = FloatField()
-    region = StringField()
-    price_type = StringField()
+    region = StringField(indexed=True)
+    price_type = StringField(indexed=True)
 
     

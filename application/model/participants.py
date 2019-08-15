@@ -1,5 +1,7 @@
 from lazy import lazy
 from mongoengine import *
+import csv
+import os
 
 class Participant(Document):
     label = StringField()
@@ -28,10 +30,23 @@ class Participant(Document):
 # I scraped the DUIDS from the "Generators and Scheduled Loads" tab.
 
 class ParticipantService(object):
+    def __init__(self):
+        costs = {}
+        with open(os.path.join('data', 'generation_costs.csv'), mode='r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            for line in reader:
+                gen_type = line['Technology Type']
+                costs[gen_type] = {
+                    'srmc': float(line['SRMC']),
+                    'lrmc': float(line['LRMC']),
+                }
+        self.costs = costs
+
     @lazy
     def participant_metadata(self):
         search = Participant.objects()
         participants = {}
+        index = 0
         for p in search:
             participants[p.DUID] = {
                 'state':p.state,
@@ -44,5 +59,44 @@ class ParticipantService(object):
                 'max_ROC_per_min':p.max_ROC_per_min,
                 'label':p.label,
                 'station_name':p.station_name,
+                'index': index,
             }
+            index += 1
         return participants
+    
+    def get_participant_list(state="ALL"):
+        participants = []
+        if state != "ALL":
+            participants = [p for p in self.participant_metadata if self.participant_metadata[p]['state'] == state ]
+        else:
+            participants = [p for p in self.participant_metadata]
+        return participants
+    
+    def get_lrmc(self, duid):
+        meta = self.participant_metadata
+        if duid in meta:
+            key = meta[duid]['fuel_source_descriptor'] + " " + meta[duid]['technology_type_descriptor']
+            if key in self.costs:
+                return self.costs[key]['lrmc']
+            else:
+                return 0
+        else:
+            return 0
+    
+    def get_srmc(self, duid):
+        # print(duid)
+        meta = self.participant_metadata
+        if duid in meta:
+            key = meta[duid]['fuel_source_descriptor'] + " " + meta[duid]['technology_type_descriptor']
+            if key in self.costs:
+                return self.costs[key]['srmc']
+            else:
+                return 0
+        else:
+            return 0
+    
+    def get_index(self, duid):
+        if duid in self.participant_metadata:
+            return self.participant_metadata[duid]['index']
+        else:
+            return None

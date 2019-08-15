@@ -5,9 +5,9 @@ import config
 connect(config.DB_NAME, host=config.MONGO_HOST,username=config.MONGO_USER, password=config.MONGO_PASSWORD, authentication_source=config.MONGO_AUTH_SOURCE)
 
 class BidDayOffer(Document):
-	SETTLEMENTDATE = DateTimeField()
+	SETTLEMENTDATE = DateTimeField(indexed=True)
 	DUID = StringField()
-	BIDTYPE = StringField()
+	BIDTYPE = StringField(indexed=True)
 	BIDSETTLEMENTDATE = DateTimeField()
 	OFFERDATE = DateTimeField()
 	VERSIONNO = IntField()
@@ -71,7 +71,7 @@ class BidPerOffer(Document):
 	
 	SETTLEMENTDATE = DateTimeField()
 	DUID = StringField()
-	BIDTYPE = StringField()
+	BIDTYPE = StringField(indexed=True)
 	BIDSETTLEMENTDATE = DateTimeField()
 	OFFERDATE = DateTimeField()
 	PERIODID = StringField()
@@ -96,7 +96,7 @@ class BidPerOffer(Document):
 	BANDAVAIL10 = FloatField()
 	LASTCHANGED = DateTimeField()
 	PASAAVAILABILITY = FloatField()
-	INTERVAL_DATETIME = DateTimeField()
+	INTERVAL_DATETIME = DateTimeField(indexed=True)
 	MR_CAPACITY = FloatField()
 	rowhash = StringField(unique=True)
 
