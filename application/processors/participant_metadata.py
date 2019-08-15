@@ -13,6 +13,7 @@ if __name__ == "__main__":
             print(line)
             p = Participant(
                 label = line['\ufeffParticipant'],
+                parent_firm = line['Parent Firm'],
                 station_name = line['Station Name'],
                 region = line['Region'],
                 state = line['Region'].translate(remove_digits),

@@ -5,6 +5,7 @@ import os
 
 class Participant(Document):
     label = StringField()
+    parent_firm = StringField()
     station_name = StringField()
     region = StringField()
     state = StringField()
@@ -18,7 +19,7 @@ class Participant(Document):
     physical_unit_no = StringField()
     unit_size_MW = FloatField()
     aggregation = StringField()
-    DUID = StringField()
+    DUID = StringField(indexed=True)
     reg_cap_MW = FloatField()
     max_cap_MW = FloatField()
     max_ROC_per_min = FloatField()
@@ -59,6 +60,7 @@ class ParticipantService(object):
                 'max_ROC_per_min':p.max_ROC_per_min,
                 'label':p.label,
                 'station_name':p.station_name,
+                'parent_firm':p.parent_firm,
                 'index': index,
             }
             index += 1
