@@ -41,8 +41,8 @@ if __name__=="__main__":
 
     raw_data_cache = 'data'
 
-    years = [2018]
-    months = [1]
+    years = [2015]
+    months = [7,8,9,10,11,12]
 
     for year in years:
         for month in months:

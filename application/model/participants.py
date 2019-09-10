@@ -66,6 +66,15 @@ class ParticipantService(object):
             index += 1
         return participants
     
+    def get_parent_firm(self, duid):
+        return self.participant_metadata[duid]['parent_firm'] if duid in self.participant_metadata else duid
+    
+    def get_state(self, duid):
+        return self.participant_metadata[duid]['state'] if duid in self.participant_metadata else None
+    
+    def get_capacity_MW(self, duid):
+        return self.participant_metadata[duid]['reg_cap_MW'] if duid in self.participant_metadata else None
+
     def get_participant_list(state="ALL"):
         participants = []
         if state != "ALL":

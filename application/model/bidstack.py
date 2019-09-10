@@ -44,6 +44,8 @@ class Bid(EmbeddedDocument):
 		}
 		return volumes[band]
 
+	def get_total_volume(self):
+		return self.bid_period_offer.BANDAVAIL1 + self.bid_period_offer.BANDAVAIL2 + self.bid_period_offer.BANDAVAIL3 + self.bid_period_offer.BANDAVAIL4 + self.bid_period_offer.BANDAVAIL5 + self.bid_period_offer.BANDAVAIL6 + self.bid_period_offer.BANDAVAIL7 + self.bid_period_offer.BANDAVAIL8 + self.bid_period_offer.BANDAVAIL9
 		
 
 class BidStack(Document):

@@ -4,9 +4,9 @@ import config
 connect(config.DB_NAME, host=config.MONGO_HOST,username=config.MONGO_USER, password=config.MONGO_PASSWORD, authentication_source=config.MONGO_AUTH_SOURCE)
 
 class DispatchLoad(Document):
-    SETTLEMENTDATE = DateTimeField(indexed=True)	 # Market date and time starting at 04:05 	DATE
+    SETTLEMENTDATE = DateTimeField()	 # Market date and time starting at 04:05 	DATE
     RUNNO = FloatField() # Dispatch run no; always 1 	NUMBER(3,0)
-    DUID = StringField(indexed=True) # Dispatchable unit identifier 	VARCHAR2(10)
+    DUID = StringField() # Dispatchable unit identifier 	VARCHAR2(10)
     TRADETYPE = IntField() # Not used 	NUMBER(2,0)
     DISPATCHINTERVAL = StringField() # Dispatch period identifier, from 001 to 288 in format YYYYMMDDPPP. 	NUMBER(22,0)
     INTERVENTION = IntField() # Intervention flag if intervention run 	NUMBER(2,0)
@@ -60,3 +60,9 @@ class DispatchLoad(Document):
     LOWER5MINACTUALAVAILABILITY = FloatField() # trapezium adjusted lower 5min availability 	NUMBER(16,6)
     LOWERREGACTUALAVAILABILITY = FloatField() # trapezium adjusted lower reg availability 	NUMBER(16,6)
     rowhash = StringField(unique=True)
+    meta = {
+        'indexes': [
+            'DUID',
+            'SETTLEMENTDATE',
+        ]
+    }

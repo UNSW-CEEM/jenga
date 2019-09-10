@@ -1,6 +1,9 @@
 from application.model.bidstack import BidStack
+from application.model.dispatch import DispatchLoad
 from application.model.participants import ParticipantService
 from application.util.interpolation_timeseries import InterpolationTimeseries
+
+from application.graph.network_rsi import LMPFactory
 
 from scipy.stats.stats import pearsonr
 
@@ -13,7 +16,7 @@ from bokeh.layouts import column, gridplot
 from bokeh.plotting import figure, show, output_file
 from bokeh.models import LinearAxis, Range1d
 
-from palettable.matplotlib import Plasma_6 as palette
+from palettable.matplotlib import Plasma_20 as palette
 
 participant_service = ParticipantService()
 
@@ -27,29 +30,77 @@ from similarity.qgram import QGram
 
 qgram = QGram(2)
 
+RESEARCH_HOURS = [0,6,12,18,24]
+
+STATES = ['QLD', 'NSW', 'VIC', 'SA', 'TAS', 'ALL']
 
 
 
-def process_bidstacks(start_date, end_date):
+
+def process(start_date, end_date):
+    
+    timeseries = {}
+    timeseries = process_bidstacks(start_date, end_date, timeseries)
+    timeseries = process_dispatch(start_date, end_date, timeseries)
+    
+    return timeseries
+
+def process_dispatch(start_date, end_date, timeseries={}):
+    dt = start_date
+
+    while dt <= end_date:
+        if dt.hour in RESEARCH_HOURS and dt.minute == 0:
+            print("Dispatch Analysis", dt)
+            query = DispatchLoad.objects(SETTLEMENTDATE=dt).fields(DUID=1, TOTALCLEARED=1)
+            dispatches = [d for d in query]
+            # Get the dispatch of each firm in the market. 
+            firm_dispatch = {}
+            total_dispatch = 0
+            for state in STATES:
+                for dispatch in dispatches:
+                    participant_state = participant_service.get_state(dispatch.DUID)
+                    if participant_state == state or state == 'ALL':
+                        if "RT_" not in dispatch.DUID:
+                            firm = participant_service.get_parent_firm(dispatch.DUID)
+                            firm_dispatch[firm] = dispatch.TOTALCLEARED if not firm in firm_dispatch else firm_dispatch[firm] + dispatch.TOTALCLEARED
+                            total_dispatch += dispatch.TOTALCLEARED
+                        
+                # Get the market share of each firm in the market, based on dispatch
+                firm_dispatch_shares = {firm: float(firm_dispatch[firm]) / float(total_dispatch) for firm in firm_dispatch}
+                
+                # Calculate and record market competition indicators.
+                timeseries[dt] = {} if dt not in timeseries else timeseries[dt]
+                timeseries[dt]['hhi_dispatch_'+state] = get_hhi(firm_dispatch_shares)
+                timeseries[dt]['four_firm_concentration_ratio_dispatch_'+state] = get_four_firm_concentration_ratio(firm_dispatch_shares)
+            
+        dt = dt.add(minutes=30)
+        # print(dt)
+    return timeseries
+    
+
+def process_bidstacks(start_date, end_date, timeseries={}):
+    """ Derives competition indicators from bids submitted by generators.  """
+
     print("Processing Bidstacks")
     # Get bidstacks for every time period. 
-    request = BidStack.objects(trading_period__gte=start_date, trading_period__lte=end_date).fields(trading_period=1, id=1)
+    query = BidStack.objects(trading_period__gte=start_date, trading_period__lte=end_date).fields(trading_period=1, id=1)
     print('Retrieved Bidstacks')
 
     i = 0
-    timeseries = {}
+    
 
-    for bidstack in request:
+    for bidstack in query:
         # Get the trading period label. 
         dt = pendulum.instance(bidstack.trading_period)
         
         # if(dt.hour == 12 and dt.minute == 0 and dt.day %5 == 0):
         # Filter based on hour so we don't process tonnes of them
-        if(dt.hour in [0,6,12,18,24] and dt.minute == 0):
-            print(dt)
+        if(dt.hour in RESEARCH_HOURS and dt.minute == 0):
+            timeseries[dt] = {} if not dt in timeseries else timeseries[dt]
+            print("Bid Analysis", dt)
             # Grab the bids and order in economic dispatch order. 
             bidstack = BidStack.objects.get(id=bidstack.id)
-            simple_bids, srmc_bids, lrmc_bids = settle(bidstack)
+            # simple_bids, srmc_bids, lrmc_bids = settle(bidstack)
             # print("Got bid stacks.")
             
             # Grab demand data. 
@@ -57,97 +108,231 @@ def process_bidstacks(start_date, end_date):
             regional_demand = {d.region:d.demand for d in demand_req}
             total_demand = int(float(sum([regional_demand[region] for region in regional_demand])))
             
-
             # Grab price data
             price_req = Price.objects(date_time = dt, price_type='AEMO_SPOT')
             regional_prices = {p.region: p.price for p in price_req}
+            # print(regional_prices)
             weighted_average_price = float(sum([regional_prices[p] * regional_demand[p] for p in regional_prices])) / float(total_demand)
+            # print(weighted_average_price)
 
-            # Get a dict of all the market shares for this time period
-            generator_shares = get_generator_market_shares(bidstack)
+            # Get a dict of all the residual supply indices, augmented with max network flows. 
+            network_residual_supply_indices = get_network_extended_residual_supply_indices(bidstack, regional_demand)
+            
+            timeseries[dt]['weighted_average_price'] = weighted_average_price
+            timeseries[dt]['demand_ALL'] = total_demand
+            timeseries[dt]['datetime'] =  dt
+            timeseries[dt]['price'] =  regional_prices
 
-            # Grab the representative strings. 
-            hhi = get_hhi(generator_shares)
-            four_firm_concentraition_ratio = get_four_firm_concentration_ratio(generator_shares)
-            # bids_string = get_representative_string(simple_bids, total_demand)
-            # srmc_string = get_representative_string(srmc_bids, total_demand)
-            # lrmc_string = get_representative_string(lrmc_bids, total_demand)
-            # print("Got Representative Strings")
+            for key in regional_demand:
+                timeseries[dt]['demand_'+key] = regional_demand[key]
+            for key in regional_prices:
+                timeseries[dt]['price_'+key] = regional_prices[key]
+                    
+
+            for state in STATES:
+                # Get a dict of all the bid-based market shares for this time period
+                generator_bid_shares = get_generator_bid_market_shares(bidstack, state)
+
+                # Get a dict of all the residual supply indices for this time period
+                residual_supply_indices = get_residual_supply_indices(bidstack, total_demand, state)
+
+                # Get a dict of all the pivotal supplier indices for this time period.
+                pivotal_supplier_indices = get_pivotal_supplier_indices(bidstack, total_demand, state)
+
+                
+                if state != "ALL":
+                    # Get a dict of all firm weighted offers
+                    firm_weighted_offer_prices = get_firm_volume_weighted_offer_price(bidstack, state)
+                    for firm in firm_weighted_offer_prices:
+                        timeseries[dt][firm.lower()+'_weighted_offer_price_'+state] = firm_weighted_offer_prices[firm]
+                    
+                    # Calculate average NERSI for all firms in the state.
+                    for firm in network_residual_supply_indices[state]:
+                        timeseries[dt][firm.lower()+'_nersi_'+state] = network_residual_supply_indices[state][firm]
+                    timeseries[dt]['average_nersi_'+state] = float(sum([network_residual_supply_indices[state][firm] for firm in network_residual_supply_indices[state]])) / float(len(network_residual_supply_indices[state]))
+
+                # Record results.
+                timeseries[dt]['hhi_bids_'+state] =  get_hhi(generator_bid_shares)
+                timeseries[dt]['four_firm_concentration_ratio_bids_'+state] = get_four_firm_concentration_ratio(generator_bid_shares)
+                timeseries[dt]['average_rsi_'+state] = float(sum([residual_supply_indices[firm] for firm in residual_supply_indices])) / float(len([f for f in residual_supply_indices]))
+                timeseries[dt]['sum_psi_'+state] = sum([pivotal_supplier_indices[firm] for firm in pivotal_supplier_indices])
+                
+                for firm in residual_supply_indices:
+                    timeseries[dt][firm.lower()+'_rsi_'+state] = residual_supply_indices[firm]
+                for firm in pivotal_supplier_indices:
+                    timeseries[dt][firm.lower()+'_psi_'+state] = pivotal_supplier_indices[firm]
             
 
-            metrics = {
-                'hhi': hhi,
-                'four_firm_concentration_ratio':four_firm_concentraition_ratio,
-                # 'srmc_string_comp': compare_representative_strings(bids_string, srmc_string),
-                # 'lrmc_string_comp': compare_representative_strings(bids_string, lrmc_string),
-                # 'srmc_fraction_MWh_different': get_fraction_MWh_different(bids_string, srmc_string, total_demand),
-                # 'lrmc_fraction_MWh_different': get_fraction_MWh_different(bids_string, lrmc_string, total_demand),
-                'datetime': dt,
-                'price': regional_prices,
-                'weighted_average_price': weighted_average_price,
-                'total_demand':total_demand,
-                'regional_demand':regional_demand,
-                'strike':{
-                    'simple': get_strike_price(simple_bids, total_demand),
-                    'srmc':get_strike_price(srmc_bids, total_demand),
-                    'lrmc': get_strike_price(lrmc_bids, total_demand),
-                }
-            }
-            timeseries[dt] = metrics
 
-             
     print("Finished Processing Bidstack")
     return timeseries
 
 
-def get_generator_market_shares(bidstack):
+def get_firm_volume_weighted_offer_price(bidstack, state):
+    participants = bidstack.getParticipants()
+    offers = {}
+    weighted_prices = {}
+    for participant in participants:
+        participant_state = participant_service.get_state(participant)
+        if participant_state == state:
+            if "RT_" not in participant:
+                bid = bidstack.getBid(participant) 
+                firm = participant_service.get_parent_firm(participant)
+                for band in range(1,9):
+                    volume = bid.get_volume(band)
+                    price = bid.get_price(band)
+                    offers[firm] = [] if not firm in offers else offers[firm]
+                    offers[firm].append({'price':price, 'volume':volume})
+    
+    for firm in offers:
+        total_volume = float(sum([offer['volume'] for offer in offers[firm]]))
+        if total_volume > 0:
+            weighted_price = 0
+            for offer in offers[firm]:
+                weight = float(offer['volume']) / total_volume
+                weighted_price += weight * float(offer['price'])
+        else:
+            weighted_price = None
+        weighted_prices[firm] = weighted_price
+    
+    return weighted_prices
+
+
+def get_generator_bid_market_shares(bidstack, state='ALL'):
     """Gets the market share of each participant. At the moment this is on a generator basis. Need to make a version that gets it on a firm basis - thats the real bullseye here. """
     participants = bidstack.getParticipants()
     shares = {}
     total_volume = 0
 
     for participant in participants:
-        if "RT_" not in participant:
-            bid = bidstack.getBid(participant) 
-            for band in range(1,9):
-                volume = bid.get_volume(band)
-                total_volume += volume
-                shares[participant] = volume if not participant in shares else shares[participant] + volume
+        participant_state = participant_service.get_state(participant)
+        # If the participant is in the desired state, or if we want all states...
+        if participant_state == state or state == 'ALL':
+            if "RT_" not in participant:
+                bid = bidstack.getBid(participant) 
+                firm = participant_service.get_parent_firm(participant)
+                for band in range(1,9):
+                    volume = bid.get_volume(band)
+                    total_volume += volume
+                    shares[firm] = volume if not firm in shares else shares[firm] + volume
     # Divide all by total volume to get the share rather than gross volume. 
-    for participant in shares:
-        shares[participant] = float(shares[participant]) / float(total_volume)
+    for firm in shares:
+        shares[firm] = float(shares[firm]) / float(total_volume)
     return shares
+
+def get_pivotal_supplier_indices(bidstack, demand, state='ALL'):
+    """
+        Pivotal supplier index for a generator is 1 if demand can be satisfied without it, otherwise 0. 
+    """
+    participants = bidstack.getParticipants()
+    volumes = {}
+    psi = {}
+    total_volume = 0
+
+    for participant in participants:
+        participant_state = participant_service.get_state(participant)
+        # If the participant is in the desired state, or if we want all states...
+        if participant_state == state or state == 'ALL':
+            if "RT_" not in participant:
+                bid = bidstack.getBid(participant)
+                firm = participant_service.get_parent_firm(participant)
+                for band in range(1,9):
+                    volume = bid.get_volume(band)
+                    total_volume += volume
+                    volumes[firm] = volume if not firm in volumes else volumes[firm] + volume
+    # Divide all by total volume to get the share rather than gross volume. 
+    for firm in volumes:
+        if total_volume - volumes[firm] >= demand:
+            psi[firm] = 0
+        else:
+            psi[firm] = 1
+    return psi
     
-def get_hhi(shares):
-    """HHI is the sum of the squares of all the firms in a market. The higher the HHI, the more highly concentrated the market."""
-    hhi = sum([shares[p] * shares[p] for p in shares])
-    return hhi
 
-def get_four_firm_concentration_ratio(shares):
-    """Four firm concentration ratio is the sum of the four biggest market shares"""
-    share_list = [shares[p] for p in shares]
-    share_list = sorted(share_list, reverse=True)
-    top_four = share_list[:4]
-    return sum(top_four)
-
-def get_residual_supply_indices(bidstack, total_demand):
-    """The Residual Supply Index (RSI) is the ratio of the total capacity of all the other generators in the market to the total market demand at a point in time. """
+def get_residual_supply_indices(bidstack, demand, state='ALL'):
+    """
+    The Residual Supply Index (RSI) is the ratio of the total capacity of all the other generators in the market to the total market demand at a point in time. 
+    """
     participants = bidstack.getParticipants()
     volumes = {}
     rsi = {}
     total_volume = 0
 
     for participant in participants:
-        if "RT_" not in participant:
-            bid = bidstack.getBid(participant) 
-            for band in range(1,9):
-                volume = bid.get_volume(band)
-                total_volume += volume
-                volumes[participant] = volume if not participant in volumes else volumes[participant] + volume
+        participant_state = participant_service.get_state(participant)
+        # If the participant is in the desired state, or if we want all states...
+        if participant_state == state or state == 'ALL':
+            if "RT_" not in participant:
+                bid = bidstack.getBid(participant) 
+                firm = participant_service.get_parent_firm(participant)
+                for band in range(1,9):
+                    volume = bid.get_volume(band)
+                    total_volume += volume
+                    volumes[firm] = volume if not firm in volumes else volumes[firm] + volume
     # Divide all by total volume to get the share rather than gross volume. 
-    for participant in volumes:
-        rsi[participant] = float(total_volume - volume[participant]) / float(total_demand)
+    for firm in volumes:
+        rsi[firm] = float(total_volume - volumes[firm]) / float(demand)
     return rsi
+
+
+
+def get_network_extended_residual_supply_indices(bidstack, regional_demand):
+    """
+        The Network-Extended Residual Supply Index (RSI) is the ratio of the total capacity of all the other generators in the market to the total market demand at a point in time. 
+        It uses spare capacity in adjacent trading nodes (not from the firm under inspection), available via interconnectors, to increase the sum of available capacity.
+        It hus produces a more relistic RSI that takes into account capacity available in other trading nodes.
+    """
+    participants = bidstack.getParticipants()
+    volumes = {state:{} for state in STATES if state != 'ALL'}
+    rsi = {state:{} for state in STATES if state != 'ALL'}
+    total_volume = {state:0 for state in STATES if state != 'ALL'} 
+    network_flow = LMPFactory().get_australian_nem()
+
+    for participant in participants:
+        # If the participant is a firm (not transmission or distributed generation)
+        if "RT_" not in participant and "DG_" not in participant:
+            state = participant_service.get_state(participant)
+            volume = bidstack.getBid(participant).get_total_volume()
+            firm = participant_service.get_parent_firm(participant)
+            if state: #some participants dont have metadata.
+                volumes[state][firm] = volume if not firm in volumes[state] else volumes[state][firm] + volume
+                total_volume[state] += volume
+            
+    # Divide all by total volume to get the share rather than gross volume. 
+    for state in volumes:
+        for firm in volumes[state]:
+            # Determine spare capacities of all other states. 
+            spare_capacity = {}
+            for other_state in regional_demand:
+                if other_state != state:
+                    firm_capacity = volumes[other_state][firm] if firm in volumes[other_state] else 0
+                    spare_capacity[other_state] = max(total_volume[other_state] - regional_demand[other_state] - firm_capacity, 0)
+            # Pass to the nersi flow calculator to find additional interstate capacity available.
+            extra_interstate_capacity = network_flow.calculate_flow(state, spare_capacity)
+            # Calculate and record the rsi
+            rsi[state][firm] = float(total_volume[state] + extra_interstate_capacity - volumes[state][firm]) / float(regional_demand[state])
+    return rsi
+
+    
+def get_hhi(shares):
+    """
+        HHI is the sum of the squares of all the market shares (as a percentage not a decimal) of firms in a market. The higher the HHI, the more highly concentrated the market.
+        Takes a shares dict - each participant name as key, their market share as value. 
+        Returns HHI.
+        """
+    hhi = sum([shares[p] * 100 * shares[p] * 100 for p in shares])
+    return hhi
+
+def get_four_firm_concentration_ratio(shares):
+    """
+        Four firm concentration ratio is the sum of the four biggest market shares
+        Takes a shares dict - each participant name as key, their market share as value. 
+        Returns Four Firm Concentration Ratio.    
+    """
+    share_list = [shares[p] for p in shares]
+    share_list = sorted(share_list, reverse=True)
+    top_four = share_list[:4]
+    return sum(top_four)
 
 
 def settle(bidstack):
@@ -179,12 +364,6 @@ def settle(bidstack):
     srmc_bids = sorted(srmc_bids, key = lambda i: i['price'])
     lrmc_bids = sorted(lrmc_bids, key = lambda i: i['price'])
 
-    # print(simple_bids)
-    # print(srmc_bids)
-    # print(lrmc_bids)
-    # simple_bids_string = get_representative_string(simple_bids)
-    # srmc_bids_string = get_representative_string(srmc_bids)
-    # lrmc_bids_string = get_representative_string(lrmc_bids)
     return simple_bids, srmc_bids, lrmc_bids
 
 
@@ -205,165 +384,134 @@ def plot_data(timeseries):
     def datetime(x):
         return np.array(x, dtype=np.datetime64)
 
-    
-    plottable = {
-        # 'srmc_qgram':[],
-        # 'lrmc_qgram':[],
-        # 'srmc_fraction_MWh_different':[],
-        # 'lrmc_fraction_MWh_different':[],
-        'hhi':[],
-        'four_firm_concentration_ratio':[],
-        'weighted_average_price':[],
-        'total_demand':[],
+    chart_pairs = [
+        # ('hhi_bids', 'weighted_average_price'),
+        # ('four_firm_concentration_ratio_bids', 'weighted_average_price'),
+        ('hhi_dispatch_ALL', 'weighted_average_price'),
+        ('four_firm_concentration_ratio_dispatch_ALL', 'weighted_average_price'),
+        ('average_rsi_ALL', 'weighted_average_price'),
+        ('sum_psi_ALL', 'weighted_average_price'),
+    ]
+
+    for state in STATES:
+        if state != 'ALL':
+            chart_pairs.append(['average_rsi_'+state, 'price_'+state])
+            chart_pairs.append(['average_nersi_'+state, 'price_'+state])
+
+    variables = {
+        # 'demand_ALL':[],
+        # 'weighted_average_price':[],
+        # 'nsw_demand':[],
+        # 'vic_demand':[],
+        # 'sa_demand':[],
+        # 'qld_demand':[],
+        # 'nsw_price':[],
+        # 'vic_price':[],
+        # 'sa_price':[],
+        # 'qld_price':[],
+        # 'hhi_bids':[],
+        # 'four_firm_concentration_ratio_bids':[],
+        # 'hhi_dispatch':[],
+        # 'four_firm_concentration_ratio_dispatch':[],
     }
 
-    scatter = {
-        'total_demand':[],
-        'weighted_average_price':[],
-        'nsw_demand':[],
-        'vic_demand':[],
-        'sa_demand':[],
-        'qld_demand':[],
-        'nsw_price':[],
-        'vic_price':[],
-        'sa_price':[],
-        'qld_price':[],
-        
-    }
-
-    strike_comparison = {
-        # 'simple':[],
-        # 'srmc':[],
-        # 'lrmc':[],
-        'weighted_average_price':[],
-    }
-
+    # Assemble timeseries into arrays of values. 
+    # First get a list of all keys. This is important as some gens enter the market late in the timeseries and without this, you end up with funky timeseries lengths. 
+    all_keys = []
     for time in sorted(timeseries.keys()):
-        
-        # plottable['srmc_qgram'].append(timeseries[time]['srmc_string_comp']['normalized_qgram'])
-        # plottable['lrmc_qgram'].append(timeseries[time]['lrmc_string_comp']['normalized_qgram'])
-        # plottable['srmc_fraction_MWh_different'].append(timeseries[time]['srmc_fraction_MWh_different'])
-        # plottable['lrmc_fraction_MWh_different'].append(timeseries[time]['lrmc_fraction_MWh_different'])
-        plottable['hhi'].append(timeseries[time]['hhi'])
-        plottable['four_firm_concentration_ratio'].append(timeseries[time]['four_firm_concentration_ratio'])
-        plottable['weighted_average_price'].append(timeseries[time]['weighted_average_price'])
-        plottable['total_demand'].append(timeseries[time]['total_demand'])
-
-        scatter['weighted_average_price'].append(timeseries[time]['weighted_average_price'])
-        scatter['total_demand'].append(timeseries[time]['total_demand'])
-
-        scatter['nsw_demand'].append(timeseries[time]['regional_demand']['NSW'])
-        scatter['vic_demand'].append(timeseries[time]['regional_demand']['VIC'])
-        scatter['sa_demand'].append(timeseries[time]['regional_demand']['SA'])
-        scatter['qld_demand'].append(timeseries[time]['regional_demand']['QLD'])
-
-        scatter['nsw_price'].append(timeseries[time]['price']['NSW'])
-        scatter['vic_price'].append(timeseries[time]['price']['VIC'])
-        scatter['sa_price'].append(timeseries[time]['price']['SA'])
-        scatter['qld_price'].append(timeseries[time]['price']['QLD'])
-        
-
-        # strike_comparison['simple'].append(timeseries[time]['strike']['simple'])
-        # strike_comparison['srmc'].append(timeseries[time]['strike']['srmc'])
-        # strike_comparison['lrmc'].append(timeseries[time]['strike']['lrmc'])
-        strike_comparison['weighted_average_price'].append(timeseries[time]['weighted_average_price'])
-            
-
-
-    p1 = figure(x_axis_type="datetime", title="Spot Bids")
-    p1.y_range = Range1d(start=0, end=1)
-    p1.extra_y_ranges = {"price": Range1d(start=0, end=200)}
-    p1.grid.grid_line_alpha=0.3
-    p1.xaxis.axis_label = 'Date'
-    p1.yaxis.axis_label = 'Price'
-
-    # participant_meta = ParticipantService().participant_metadata
-    for i, metric in enumerate(plottable.keys()):
-        if metric not in ['weighted_average_price', 'total_demand', 'srmc_qgram', 'lrmc_qgram']:
-            print(metric)
-            color = palette.hex_colors[i % len(palette.hex_colors)]
-            p1.line(datetime(sorted(timeseries.keys())), plottable[metric], color=color, legend=metric)
-    # p1.line(datetime(sorted(timeseries.keys())), lgc_prices, legend="LGC Price", line_width = 2,  line_dash='dashed')
-    # p1.line(datetime(sorted(timeseries.keys())), plottable['weighted_average_price'], color="blue",line_width = 2,  line_dash='dashed', y_range_name="price")
-    # p1.add_layout(LinearAxis(y_range_name="price"), 'left')
-    p1.legend.location = "top_left"
-
-
-
-
-    p2 = figure(x_axis_type="datetime", title="Spot Market Prices")
-    p2.grid.grid_line_alpha=0.3
-    p2.xaxis.axis_label = 'Date'
-    p2.yaxis.axis_label = 'Strike Price'
-    for i, metric in enumerate(strike_comparison.keys()):
-            color = palette.hex_colors[i % len(palette.hex_colors)]
-            p2.line(datetime(sorted(timeseries.keys())), strike_comparison[metric], color=color, legend=metric)
+        for key in timeseries[time]:
+            if key not in all_keys:
+                all_keys.append(key)
+    # Now do the actual assemblaging into lists. 
+    for time in sorted(timeseries.keys()):
+        for key in all_keys:
+            variables[key] = [] if key not in variables else variables[key]
+            if key in timeseries[time]:
+                variables[key].append(timeseries[time][key])
+            else:
+                variables[key].append(None)
     
-    p2.legend.location = "top_left"
+    plots = []
 
-    # p3 = figure(title="LRMC Fraction vs Spot Price (Scatter)")
-    # p3.xaxis.axis_label="LRMC Fraction"
-    # p3.yaxis.axis_label="Weighted Average Spot Price"
-    # p3.circle(plottable['lrmc_fraction_MWh_different'], plottable['weighted_average_price'])
+    # timeseries_chart = figure(x_axis_type="datetime", title="Spot Bids")
+    # timeseries_chart.y_range = Range1d(start=0, end=1)
+    # timeseries_chart.extra_y_ranges = {"price": Range1d(start=0, end=200)}
+    # timeseries_chart.grid.grid_line_alpha=0.3
+    # timeseries_chart.xaxis.axis_label = 'Date'
+    # timeseries_chart.yaxis.axis_label = 'Price'
 
-    # p4 = figure(title="LRMC Fraction vs Demand (Scatter)")
-    # p4.xaxis.axis_label="LRMC Fraction"
-    # p4.yaxis.axis_label="Demand"
-    # p4.circle(plottable['lrmc_fraction_MWh_different'], plottable['total_demand'])
+    # # participant_meta = ParticipantService().participant_metadata
+    # for i, metric in enumerate(indices.keys()):
+    #     if metric not in ['weighted_average_price', 'demand_ALL', 'srmc_qgram', 'lrmc_qgram']:
+    #         print(metric)
+    #         color = palette.hex_colors[i % len(palette.hex_colors)]
+    #         timeseries_chart.line(datetime(sorted(timeseries.keys())), indices[metric], color=color, legend=metric)
 
-    # p5 = figure(title="SRMC Fraction vs Spot Price (Scatter)")
-    # p5.xaxis.axis_label="SRMC Fraction"
-    # p5.yaxis.axis_label="Weighted Average Spot Price"
-    # p5.circle(plottable['srmc_fraction_MWh_different'], plottable['weighted_average_price'])
+    # timeseries_chart.legend.location = "top_left"
 
-    # p6 = figure(title="SRMC Fraction vs Demand (Scatter)")
-    # p6.xaxis.axis_label="SRMC Fraction"
-    # p6.yaxis.axis_label="Demand"
-    # p6.circle(plottable['srmc_fraction_MWh_different'], plottable['total_demand'])
 
-   
+    # plots.append(timeseries_chart)
 
-    plots = [[p1], [p2]]
+    # X/Y Scatter with residual supplier inidces of all firms. 
+    for state in STATES:
+        residual_scatter = figure(title=state+" Firm Residual Supply Index as a function of Total Demand")
+        i = 0
+        for variable in variables:
+            # Start a new chart if this one is full. 
+            if i == 20:
+                i = 0
+                plots.append([residual_scatter])
+                residual_scatter = figure(title=state+" Firm Residual Supply Index as a function of Total Demand")
+            # Add data set to chart
+            if '_rsi_'+state in variable and 'average_rsi' not in variable:
+                color = palette.hex_colors[i % len(palette.hex_colors)]
+                residual_scatter.circle(variables['demand_'+state], variables[variable], color=color, legend=variable.replace('_rsi_'+state, ''))
+                i+= 1
+        plots.append([residual_scatter])
 
-    for key in scatter:
-        hhi = figure(title="HHI vs "+key)
-        hhi.xaxis.axis_label="HHI"
-        hhi.yaxis.axis_label=key
-        hhi.circle( scatter[key], plottable['hhi'])
+    # X/Y Scatter with network-augmented residual supplier inidces of all firms. 
+    for state in STATES:
+        if state != 'ALL':
+            residual_scatter = figure(title=state+" Network-Extended Firm Residual Supply Index as a function of Total Demand")
+            i = 0
+            for variable in variables:
+                # Start a new chart if this one is full. 
+                if i == 20:
+                    i = 0
+                    plots.append([residual_scatter])
+                    residual_scatter = figure(title=state+" Network Extended Firm Residual Supply Index as a function of Total Demand")
+                # Add data set to chart
+                if '_nersi_'+state in variable and 'average_nersi' not in variable:
+                    print("YO",variable)
+                    color = palette.hex_colors[i % len(palette.hex_colors)]
+                    residual_scatter.circle(variables['demand_'+state], variables[variable], color=color, legend=variable.replace('_nersi_'+state, ''))
+                    i+= 1
+            plots.append([residual_scatter])
 
-        four_firm = figure(title="Four Firm Concentration Index vs "+key)
-        four_firm.xaxis.axis_label="Four Firm Concentration Index"
-        four_firm.yaxis.axis_label=key
-        four_firm.circle(scatter[key], plottable['four_firm_concentration_ratio'])
-
-        plots.append([hhi])
-        plots.append([four_firm])
-        # plots.append([srmc_qgram_scatter])
-        # plots.append([lrmc_qgram_scatter])
-
+    # X/Y Scatter charts based on chart_pairs
+    for pair in chart_pairs:
+        # get rid of Nones - no good for pearson correlation calc. 
+        x_series = []
+        y_series = []
+        for i in range(len(variables[pair[0]])):
+            if pair[0][i] and pair[1][i]:
+                x_series.append(variables[pair[0]][i])
+                y_series.append(variables[pair[1]][i])
+        new_plot = figure(title=pair[0] + " as a function of " + pair[1])
+        new_plot.xaxis.axis_label=pair[0]
+        new_plot.yaxis.axis_label=pair[1]
+        new_plot.circle(x_series, y_series)
+        plots.append([new_plot])
         print("\n")
-        print("HHI Pearson Correlation with "+key, pearsonr(scatter[key], plottable['hhi']))
-        print("Four Firm Concentration Ratio Pearson Correlation with "+key, pearsonr(scatter[key], plottable['four_firm_concentration_ratio']))
-        
+        print(x_series)
+        print(y_series)
+        print(pair[0]," Pearson Correlation with ",pair[1], pearsonr(x_series, y_series))
         print("\n")
     
-    
-    
-    # print("\n\nTotals:")
-    # print("SRMC Q-Gram Pearson Correlation with Price", pearsonr(plottable['srmc_qgram'],plottable['weighted_average_price']))
-    # print("LRMC Q-Gram Pearson Correlation with Price", pearsonr(plottable['lrmc_qgram'],plottable['weighted_average_price']))
-    # print("SRMC Fraction MWh Different Pearson Correlation with Price", pearsonr(plottable['srmc_fraction_MWh_different'],plottable['weighted_average_price']))
-    # print("LRMC Fraction MWh Different Pearson Correlation with Price", pearsonr(plottable['lrmc_fraction_MWh_different'],plottable['weighted_average_price']))
-
-    # print("SRMC Q-Gram Pearson Correlation with Demand", pearsonr(plottable['srmc_qgram'],plottable['total_demand']))
-    # print("LRMC Q-Gram Pearson Correlation with Demand", pearsonr(plottable['lrmc_qgram'],plottable['total_demand']))
-    # print("SRMC Fraction MWh Different Pearson Correlation with Demand", pearsonr(plottable['srmc_fraction_MWh_different'],plottable['total_demand']))
-    # print("LRMC Fraction MWh Different Pearson Correlation with Demand", pearsonr(plottable['lrmc_fraction_MWh_different'],plottable['total_demand']))
-
-    show(gridplot(plots, plot_width=1200, plot_height=500))  # open a browser
+    show(gridplot(plots, plot_width=1200, plot_height=600))  # open a browser
 
 if __name__=="__main__":
-    start_date = pendulum.datetime(2018,1,1,12)
+    start_date = pendulum.datetime(2018,12,20,12)
     end_date = pendulum.datetime(2018,12,30,12)
-    timeseries = process_bidstacks(start_date, end_date)
+    timeseries = process(start_date, end_date)
     plot_data(timeseries)

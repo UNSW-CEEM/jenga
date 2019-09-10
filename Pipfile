@@ -16,7 +16,7 @@ bokeh = "*"
 palettable = "*"
 strsim = "*"
 scipy = "*"
-opennempy = "*"
+networkx = "*"
 
 [dev-packages]
 pylint = "*"
