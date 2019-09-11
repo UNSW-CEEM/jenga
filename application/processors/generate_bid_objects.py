@@ -10,8 +10,8 @@ import pendulum
 if __name__ == "__main__":
     counter = 0
 
-    start_date = pendulum.datetime(2018,11,28,12, tz="Australia/Brisbane")
-    end_date = pendulum.datetime(2018,12,29,12, tz="Australia/Brisbane")
+    start_date = pendulum.datetime(2017,1,1,0, tz="Australia/Brisbane")
+    end_date = pendulum.datetime(2018,1,1,0, tz="Australia/Brisbane")
     date = start_date
     # for date in dates:
     while date < end_date:

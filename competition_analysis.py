@@ -7,10 +7,13 @@ from application.graph.network_rsi import LMPFactory
 
 from scipy.stats.stats import pearsonr
 
+from prettytable import PrettyTable
+
 import os
 import csv
 import pendulum
 import numpy as np
+
 
 from bokeh.layouts import column, gridplot
 from bokeh.plotting import figure, show, output_file
@@ -71,6 +74,7 @@ def process_dispatch(start_date, end_date, timeseries={}):
                 # Calculate and record market competition indicators.
                 timeseries[dt] = {} if dt not in timeseries else timeseries[dt]
                 timeseries[dt]['hhi_dispatch_'+state] = get_hhi(firm_dispatch_shares)
+                timeseries[dt]['entropy_dispatch_'+state] = get_entropy(firm_dispatch_shares)
                 timeseries[dt]['four_firm_concentration_ratio_dispatch_'+state] = get_four_firm_concentration_ratio(firm_dispatch_shares)
             
         dt = dt.add(minutes=30)
@@ -150,11 +154,14 @@ def process_bidstacks(start_date, end_date, timeseries={}):
                     for firm in network_residual_supply_indices[state]:
                         timeseries[dt][firm.lower()+'_nersi_'+state] = network_residual_supply_indices[state][firm]
                     timeseries[dt]['average_nersi_'+state] = float(sum([network_residual_supply_indices[state][firm] for firm in network_residual_supply_indices[state]])) / float(len(network_residual_supply_indices[state]))
+                    timeseries[dt]['minimum_nersi_'+state] = min([network_residual_supply_indices[state][firm] for firm in network_residual_supply_indices[state]])
 
                 # Record results.
                 timeseries[dt]['hhi_bids_'+state] =  get_hhi(generator_bid_shares)
+                timeseries[dt]['entropy_bids_'+state] =  get_entropy(generator_bid_shares)
                 timeseries[dt]['four_firm_concentration_ratio_bids_'+state] = get_four_firm_concentration_ratio(generator_bid_shares)
                 timeseries[dt]['average_rsi_'+state] = float(sum([residual_supply_indices[firm] for firm in residual_supply_indices])) / float(len([f for f in residual_supply_indices]))
+                timeseries[dt]['minimum_rsi_'+state] = min([residual_supply_indices[firm] for firm in residual_supply_indices])
                 timeseries[dt]['sum_psi_'+state] = sum([pivotal_supplier_indices[firm] for firm in pivotal_supplier_indices])
                 
                 for firm in residual_supply_indices:
@@ -323,6 +330,13 @@ def get_hhi(shares):
     hhi = sum([shares[p] * 100 * shares[p] * 100 for p in shares])
     return hhi
 
+def get_entropy(shares):
+    """
+        Entropy is sum of Si * log2 (1/Si) where Si is the share of the market of participant i, expressed as a fraction. 
+        """
+    entropy = sum([shares[p] * np.log2(1.0/ shares[p] ) for p in shares if shares[p] > 0])
+    return entropy
+
 def get_four_firm_concentration_ratio(shares):
     """
         Four firm concentration ratio is the sum of the four biggest market shares
@@ -377,9 +391,164 @@ def get_strike_price(bids, demand):
             return bid['price']
     return 14000
 
+def get_hhi_stat_table(timeseries):
+    """Extracts a number of metrics related to HHI"""
+
+    table = PrettyTable()
+    table.field_names = ["Metric","Label", "Value"]
+
+    MODERATELY_CONCENTRATED = 1500
+    HIGHLY_CONCENTRATED = 2500
+    total_count = {}
+    moderately = {}
+    highly = {}
+    for t in timeseries:
+        for key in timeseries[t]:
+            if 'hhi_' in key:
+                total_count[key] = 1 if key not in total_count else total_count[key] + 1
+                moderately[key] = 0 if key not in moderately else moderately[key]
+                highly[key] = 0 if key not in highly else highly[key]
+                if timeseries[t][key] > HIGHLY_CONCENTRATED:
+                    highly[key] += 1
+                elif timeseries[t][key] > MODERATELY_CONCENTRATED:
+                    moderately[key] += 1
+    
+    for key in total_count:
+        table.add_row([key, "% Highly", 100.0 * float(highly[key])/ float(total_count[key])])
+        table.add_row([key, "% Moderately", 100.0 * float(moderately[key])/ float(total_count[key])])
+        # table.add_row([key, "Count Moderately", moderately[key]])
+        # table.add_row([key, "Count Highly", highly[key]])
+        # table.add_row([key, "Count Total", total_count[key] ])
+    return table
+
+
+def get_entropy_stat_table(timeseries):
+    """Extracts a number of metrics related to entropy"""
+
+    table = PrettyTable()
+    table.field_names = ["Metric","Label", "Value"]
+
+    THRESHOLD = 3.32
+    HIGHLY_CONCENTRATED = 2500
+    total_count = {}
+    concentrated = {}
+    
+    for t in timeseries:
+        for key in timeseries[t]:
+            if 'entropy_' in key:
+                total_count[key] = 1 if key not in total_count else total_count[key] + 1
+                concentrated[key] = 0 if key not in concentrated else concentrated[key]
+                if timeseries[t][key] < THRESHOLD:
+                    concentrated[key] += 1
+    
+    for key in total_count:
+        table.add_row([key, "% Concentrated", 100.0 * float(concentrated[key])/ float(total_count[key])])
+    return table
+
+def get_four_firm_stat_table(timeseries):
+    """Extracts a number of metrics related to 4-Firm Concn Ratio"""
+
+    table = PrettyTable()
+    table.field_names = ["Metric","Label", "Value"]
+
+    MODERATELY_CONCENTRATED = 50
+    HIGHLY_CONCENTRATED = 0.8
+    total_count = {}
+    moderately = {}
+    highly = {}
+    for t in timeseries:
+        for key in timeseries[t]:
+            if 'four_firm' in key:
+                total_count[key] = 1 if key not in total_count else total_count[key] + 1
+                moderately[key] = 0 if key not in moderately else moderately[key]
+                highly[key] = 0 if key not in highly else highly[key]
+                if timeseries[t][key] > HIGHLY_CONCENTRATED:
+                    highly[key] += 1
+                elif timeseries[t][key] > MODERATELY_CONCENTRATED:
+                    moderately[key] += 1
+    
+    for key in total_count:
+        table.add_row([key, "% Highly", 100.0 * float(highly[key])/ float(total_count[key])])
+        table.add_row([key, "% Moderately", 100.0 * float(moderately[key])/ float(total_count[key])])
+      
+    return table
+
+def get_rsi_stat_table(timeseries):
+    """Extracts a number of metrics related to RSI"""
+
+    table = PrettyTable()
+    table.field_names = ["Metric","Label", "Value"]
+
+    THRESHOLD = 1
+    total_count = {}
+    under_threshold = {}
+    
+    for t in timeseries:
+        for key in timeseries[t]:
+            if 'minimum_rsi' in key:
+                total_count[key] = 1 if key not in total_count else total_count[key] + 1
+                under_threshold[key] = 0 if key not in under_threshold else under_threshold[key]
+                if timeseries[t][key] < THRESHOLD:
+                    under_threshold[key] += 1
+                
+    
+    for key in total_count:
+        table.add_row([key, "% Under", 100.0 * float(under_threshold[key])/ float(total_count[key])])
+    return table
+
+def get_nersi_stat_table(timeseries):
+    """Extracts a number of metrics related to NERSI"""
+
+    table = PrettyTable()
+    table.field_names = ["Metric","Label", "Value"]
+
+    THRESHOLD = 1
+    total_count = {}
+    under_threshold = {}
+    
+    for t in timeseries:
+        for key in timeseries[t]:
+            if 'minimum_nersi' in key:
+                total_count[key] = 1 if key not in total_count else total_count[key] + 1
+                under_threshold[key] = 0 if key not in under_threshold else under_threshold[key]
+                if timeseries[t][key] < THRESHOLD:
+                    under_threshold[key] += 1
+                
+    
+    for key in total_count:
+        table.add_row([key, "% Under", 100.0 * float(under_threshold[key])/ float(total_count[key])])
+    return table
+
+def get_psi_stat_table(timeseries):
+    """Extracts a number of metrics related to PSI"""
+
+    table = PrettyTable()
+    table.field_names = ["Metric","Label", "Value"]
+
+    total_count = {}
+    some_over = {}
+    
+    for t in timeseries:
+        for key in timeseries[t]:
+            if 'sum_psi' in key:
+                total_count[key] = 1 if key not in total_count else total_count[key] + 1
+                some_over[key] = 0 if key not in some_over else some_over[key]
+                if timeseries[t][key] > 0:
+                    some_over[key] += 1
+                
+    
+    for key in total_count:
+        table.add_row([key, "% w/ PSI", 100.0 * float(some_over[key])/ float(total_count[key])])
+    return table
 
 def plot_data(timeseries):
 
+    correlation_table = PrettyTable()
+    correlation_table.field_names = ["X","Y", "Correlation", "P-Value"]
+    
+
+    
+    
 
     def datetime(x):
         return np.array(x, dtype=np.datetime64)
@@ -388,15 +557,18 @@ def plot_data(timeseries):
         # ('hhi_bids', 'weighted_average_price'),
         # ('four_firm_concentration_ratio_bids', 'weighted_average_price'),
         ('hhi_dispatch_ALL', 'weighted_average_price'),
+        ('entropy_dispatch_ALL', 'weighted_average_price'),
         ('four_firm_concentration_ratio_dispatch_ALL', 'weighted_average_price'),
         ('average_rsi_ALL', 'weighted_average_price'),
+        ('minimum_rsi_ALL', 'weighted_average_price'),
         ('sum_psi_ALL', 'weighted_average_price'),
     ]
 
     for state in STATES:
         if state != 'ALL':
-            chart_pairs.append(['average_rsi_'+state, 'price_'+state])
-            chart_pairs.append(['average_nersi_'+state, 'price_'+state])
+            chart_pairs.append(['minimum_rsi_'+state, 'price_'+state])
+            chart_pairs.append(['minimum_nersi_'+state, 'price_'+state])
+            # chart_pairs.append(['average_nersi_'+state, 'price_'+state])
 
     variables = {
         # 'demand_ALL':[],
@@ -452,6 +624,32 @@ def plot_data(timeseries):
 
     # plots.append(timeseries_chart)
 
+    
+
+    # X/Y Scatter charts based on chart_pairs
+    for pair in chart_pairs:
+        # get rid of Nones - no good for pearson correlation calc. 
+        x_series = []
+        y_series = []
+        for i in range(len(variables[pair[0]])):
+            if variables[pair[0]][i] and variables[pair[1]][i]:
+                x_series.append(variables[pair[0]][i])
+                y_series.append(variables[pair[1]][i])
+        new_plot = figure(title=pair[0] + " as a function of " + pair[1])
+        new_plot.xaxis.axis_label=pair[0]
+        new_plot.yaxis.axis_label=pair[1]
+        new_plot.circle(x_series, y_series)
+        plots.append([new_plot])
+        print("\n")
+        
+        if len(x_series) > 2:
+            correlation = pearsonr(x_series, y_series)
+            print(pair[0]," Pearson Correlation with ",pair[1], correlation)
+            correlation_table.add_row([pair[0], pair[1], correlation[0], correlation[1]])
+        else:
+            print("Not enough data points to calculate pearson correlation between ", pair[0],'and', pair[1])
+        print("\n")
+    
     # X/Y Scatter with residual supplier inidces of all firms. 
     for state in STATES:
         residual_scatter = figure(title=state+" Firm Residual Supply Index as a function of Total Demand")
@@ -467,6 +665,7 @@ def plot_data(timeseries):
                 color = palette.hex_colors[i % len(palette.hex_colors)]
                 residual_scatter.circle(variables['demand_'+state], variables[variable], color=color, legend=variable.replace('_rsi_'+state, ''))
                 i+= 1
+            
         plots.append([residual_scatter])
 
     # X/Y Scatter with network-augmented residual supplier inidces of all firms. 
@@ -481,37 +680,33 @@ def plot_data(timeseries):
                     plots.append([residual_scatter])
                     residual_scatter = figure(title=state+" Network Extended Firm Residual Supply Index as a function of Total Demand")
                 # Add data set to chart
-                if '_nersi_'+state in variable and 'average_nersi' not in variable:
-                    print("YO",variable)
+                if 'minimum_nersi_'+state in variable and 'average_nersi' not in variable:
                     color = palette.hex_colors[i % len(palette.hex_colors)]
                     residual_scatter.circle(variables['demand_'+state], variables[variable], color=color, legend=variable.replace('_nersi_'+state, ''))
                     i+= 1
             plots.append([residual_scatter])
-
-    # X/Y Scatter charts based on chart_pairs
-    for pair in chart_pairs:
-        # get rid of Nones - no good for pearson correlation calc. 
-        x_series = []
-        y_series = []
-        for i in range(len(variables[pair[0]])):
-            if pair[0][i] and pair[1][i]:
-                x_series.append(variables[pair[0]][i])
-                y_series.append(variables[pair[1]][i])
-        new_plot = figure(title=pair[0] + " as a function of " + pair[1])
-        new_plot.xaxis.axis_label=pair[0]
-        new_plot.yaxis.axis_label=pair[1]
-        new_plot.circle(x_series, y_series)
-        plots.append([new_plot])
-        print("\n")
-        print(x_series)
-        print(y_series)
-        print(pair[0]," Pearson Correlation with ",pair[1], pearsonr(x_series, y_series))
-        print("\n")
     
+    print(correlation_table)
     show(gridplot(plots, plot_width=1200, plot_height=600))  # open a browser
 
+def table_data(timeseries):
+    hhi_table = get_hhi_stat_table(timeseries)
+    entropy_table = get_entropy_stat_table(timeseries)
+    four_firm_table = get_four_firm_stat_table(timeseries)
+    psi_table = get_psi_stat_table(timeseries)
+    rsi_table = get_rsi_stat_table(timeseries)
+    nersi_table = get_nersi_stat_table(timeseries)
+    print(hhi_table)
+    print(entropy_table)
+    print(four_firm_table)
+    print(psi_table)
+    print(rsi_table)
+    print(nersi_table)
+    
+
 if __name__=="__main__":
-    start_date = pendulum.datetime(2018,12,20,12)
-    end_date = pendulum.datetime(2018,12,30,12)
+    start_date = pendulum.datetime(2018,1,1,12)
+    end_date = pendulum.datetime(2018,1,5,12)
     timeseries = process(start_date, end_date)
     plot_data(timeseries)
+    table_data(timeseries)

@@ -17,6 +17,7 @@ palettable = "*"
 strsim = "*"
 scipy = "*"
 networkx = "*"
+ptable = "*"
 
 [dev-packages]
 pylint = "*"
