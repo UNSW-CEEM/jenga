@@ -93,9 +93,9 @@ def process_bidstacks(dt, timeseries={}):
 
     print("Processing Bidstack")
     # Get bidstacks for every time period. 
-    bidstack = BidStack.objects.get(trading_period=start_date)
+    bidstack = BidStack.objects.get(trading_period=dt)
     print('Retrieved Bidstacks', bidstack)
-
+    
     # Get the trading period label. 
     
     
