@@ -16,6 +16,10 @@ import pendulum
 import numpy as np
 import re
 
+# real    0m37.181s
+# user    0m32.385s
+# sys     0m1.266s
+
 
 from bokeh.layouts import column, gridplot
 from bokeh.plotting import figure, show, output_file
@@ -738,5 +742,7 @@ if __name__=="__main__":
     start_date = pendulum.datetime(2018,1,1,12)
     end_date = pendulum.datetime(2018,1,10,12)
     timeseries = process(start_date, end_date)
+    # print(timeseries)
+    print([key for key in timeseries])
     plot_data(timeseries)
     table_data(timeseries)

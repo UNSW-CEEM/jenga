@@ -43,136 +43,133 @@ STATES = ['QLD', 'NSW', 'VIC', 'SA', 'TAS', 'ALL']
 
 
 def process(start_date, end_date):
-    
     timeseries = {}
-    timeseries = process_bidstacks(start_date, end_date, timeseries)
-    timeseries = process_dispatch(start_date, end_date, timeseries)
-    
+    current = start_date
+    while current < end_date:
+        if current.hour in RESEARCH_HOURS and current.minute == 0:
+            timeseries[current] = {}
+            timeseries = process_bidstacks(current, timeseries)
+            timeseries = process_dispatch(current, timeseries)
+            print(current)
+            print(timeseries[current])
+        current = current.add(minutes=30)
+
     return timeseries
 
-def process_dispatch(start_date, end_date, timeseries={}):
-    dt = start_date
+def process_dispatch(dt, timeseries={}):
 
-    while dt <= end_date:
-        if dt.hour in RESEARCH_HOURS and dt.minute == 0:
-            print("Dispatch Analysis", dt)
-            query = DispatchLoad.objects(SETTLEMENTDATE=dt).fields(DUID=1, TOTALCLEARED=1)
-            dispatches = [d for d in query]
-            # Get the dispatch of each firm in the market. 
-            firm_dispatch = {}
-            total_dispatch = 0
-            for state in STATES:
-                for dispatch in dispatches:
-                    participant_state = participant_service.get_state(dispatch.DUID)
-                    if participant_state == state or state == 'ALL':
-                        if "RT_" not in dispatch.DUID:
-                            firm = participant_service.get_parent_firm(dispatch.DUID)
-                            firm_dispatch[firm] = dispatch.TOTALCLEARED if not firm in firm_dispatch else firm_dispatch[firm] + dispatch.TOTALCLEARED
-                            total_dispatch += dispatch.TOTALCLEARED
-                        
-                # Get the market share of each firm in the market, based on dispatch
-                firm_dispatch_shares = {firm: float(firm_dispatch[firm]) / float(total_dispatch) for firm in firm_dispatch}
+    print("Dispatch Analysis", dt)
+    query = DispatchLoad.objects(SETTLEMENTDATE=dt).fields(DUID=1, TOTALCLEARED=1)
+    dispatches = [d for d in query]
+    # print(dispatches)
+    # Get the dispatch of each firm in the market. 
+    firm_dispatch = {}
+    total_dispatch = 0
+    for state in STATES:
+        for dispatch in dispatches:
+            participant_state = participant_service.get_state(dispatch.DUID)
+            if participant_state == state or state == 'ALL':
+                if "RT_" not in dispatch.DUID:
+                    firm = participant_service.get_parent_firm(dispatch.DUID)
+                    firm_dispatch[firm] = dispatch.TOTALCLEARED if not firm in firm_dispatch else firm_dispatch[firm] + dispatch.TOTALCLEARED
+                    total_dispatch += dispatch.TOTALCLEARED
                 
-                # Calculate and record market competition indicators.
-                timeseries[dt] = {} if dt not in timeseries else timeseries[dt]
-                timeseries[dt]['hhi_dispatch_'+state] = get_hhi(firm_dispatch_shares)
-                timeseries[dt]['entropy_dispatch_'+state] = get_entropy(firm_dispatch_shares)
-                timeseries[dt]['four_firm_concentration_ratio_dispatch_'+state] = get_four_firm_concentration_ratio(firm_dispatch_shares)
-            
-        dt = dt.add(minutes=30)
+        # Get the market share of each firm in the market, based on dispatch
+        firm_dispatch_shares = {firm: float(firm_dispatch[firm]) / float(total_dispatch) for firm in firm_dispatch}
+        
+        # Calculate and record market competition indicators.
+        
+        timeseries[dt]['hhi_dispatch_'+state] = get_hhi(firm_dispatch_shares)
+        timeseries[dt]['entropy_dispatch_'+state] = get_entropy(firm_dispatch_shares)
+        timeseries[dt]['four_firm_concentration_ratio_dispatch_'+state] = get_four_firm_concentration_ratio(firm_dispatch_shares)
+        
         # print(dt)
+        
     return timeseries
     
 
-def process_bidstacks(start_date, end_date, timeseries={}):
+def process_bidstacks(dt, timeseries={}):
     """ Derives competition indicators from bids submitted by generators.  """
 
-    print("Processing Bidstacks")
+    print("Processing Bidstack")
     # Get bidstacks for every time period. 
-    query = BidStack.objects(trading_period__gte=start_date, trading_period__lte=end_date).fields(trading_period=1, id=1)
-    print('Retrieved Bidstacks')
+    bidstack = BidStack.objects.get(trading_period=start_date)
+    print('Retrieved Bidstacks', bidstack)
 
-    i = 0
+    # Get the trading period label. 
     
+    
+    # Filter based on hour so we don't process tonnes of them
+    timeseries[dt] = {} if not dt in timeseries else timeseries[dt]
+    print("Bid Analysis", dt)
+    # Grab the bids and order in economic dispatch order. 
+    
+    # simple_bids, srmc_bids, lrmc_bids = settle(bidstack)
+    # dt = pendulum.instance(bidstack.trading_period)
+    # Grab demand data. 
+    demand_req = Demand.objects(date_time=dt)
+    regional_demand = {d.region:d.demand for d in demand_req}
+    total_demand = int(float(sum([regional_demand[region] for region in regional_demand])))
+    
+    # Grab price data
+    price_req = Price.objects(date_time = dt, price_type='AEMO_SPOT')
+    regional_prices = {p.region: p.price for p in price_req}
+    # print(regional_prices)
+    weighted_average_price = float(sum([regional_prices[p] * regional_demand[p] for p in regional_prices])) / float(total_demand)
+    # print(weighted_average_price)
 
-    for bidstack in query:
-        # Get the trading period label. 
-        dt = pendulum.instance(bidstack.trading_period)
+    # Get a dict of all the residual supply indices, augmented with max network flows. 
+    network_residual_supply_indices = get_network_extended_residual_supply_indices(bidstack, regional_demand)
+    
+    timeseries[dt]['weighted_average_price'] = weighted_average_price
+    
+    timeseries[dt]['demand_ALL'] = total_demand
+    timeseries[dt]['datetime'] =  dt
+    timeseries[dt]['price'] =  regional_prices
+
+    for key in regional_demand:
+        timeseries[dt]['demand_'+key] = regional_demand[key]
+    for key in regional_prices:
+        timeseries[dt]['price_'+key] = regional_prices[key]
+            
+
+    for state in STATES:
+        # Get a dict of all the bid-based market shares for this time period
+        generator_bid_shares = get_generator_bid_market_shares(bidstack, state)
+
+        # Get a dict of all the residual supply indices for this time period
+        residual_supply_indices = get_residual_supply_indices(bidstack, total_demand, state)
+
+        # Get a dict of all the pivotal supplier indices for this time period.
+        pivotal_supplier_indices = get_pivotal_supplier_indices(bidstack, total_demand, state)
+
         
-        # if(dt.hour == 12 and dt.minute == 0 and dt.day %5 == 0):
-        # Filter based on hour so we don't process tonnes of them
-        if(dt.hour in RESEARCH_HOURS and dt.minute == 0):
-            timeseries[dt] = {} if not dt in timeseries else timeseries[dt]
-            print("Bid Analysis", dt)
-            # Grab the bids and order in economic dispatch order. 
-            bidstack = BidStack.objects.get(id=bidstack.id)
-            # simple_bids, srmc_bids, lrmc_bids = settle(bidstack)
-            # print("Got bid stacks.")
+        if state != "ALL":
+            # Get a dict of all firm weighted offers
+            firm_weighted_offer_prices = get_firm_volume_weighted_offer_price(bidstack, state)
+            for firm in firm_weighted_offer_prices:
+                timeseries[dt][firm.lower()+'_weighted_offer_price_'+state] = firm_weighted_offer_prices[firm]
             
-            # Grab demand data. 
-            demand_req = Demand.objects(date_time=dt)
-            regional_demand = {d.region:d.demand for d in demand_req}
-            total_demand = int(float(sum([regional_demand[region] for region in regional_demand])))
+            # Calculate average NERSI for all firms in the state.
+            for firm in network_residual_supply_indices[state]:
+                timeseries[dt][firm.lower()+'_nersi_'+state] = network_residual_supply_indices[state][firm]
+            timeseries[dt]['average_nersi_'+state] = float(sum([network_residual_supply_indices[state][firm] for firm in network_residual_supply_indices[state]])) / float(len(network_residual_supply_indices[state]))
+            timeseries[dt]['minimum_nersi_'+state] = min([network_residual_supply_indices[state][firm] for firm in network_residual_supply_indices[state]])
+
+        # Record results.
+        timeseries[dt]['hhi_bids_'+state] =  get_hhi(generator_bid_shares)
+        timeseries[dt]['entropy_bids_'+state] =  get_entropy(generator_bid_shares)
+        timeseries[dt]['four_firm_concentration_ratio_bids_'+state] = get_four_firm_concentration_ratio(generator_bid_shares)
+        timeseries[dt]['average_rsi_'+state] = float(sum([residual_supply_indices[firm] for firm in residual_supply_indices])) / float(len([f for f in residual_supply_indices]))
+        timeseries[dt]['minimum_rsi_'+state] = min([residual_supply_indices[firm] for firm in residual_supply_indices])
+        timeseries[dt]['sum_psi_'+state] = sum([pivotal_supplier_indices[firm] for firm in pivotal_supplier_indices])
+        
+        for firm in residual_supply_indices:
+            timeseries[dt][firm.lower()+'_rsi_'+state] = residual_supply_indices[firm]
+        for firm in pivotal_supplier_indices:
+            timeseries[dt][firm.lower()+'_psi_'+state] = pivotal_supplier_indices[firm]
             
-            # Grab price data
-            price_req = Price.objects(date_time = dt, price_type='AEMO_SPOT')
-            regional_prices = {p.region: p.price for p in price_req}
-            # print(regional_prices)
-            weighted_average_price = float(sum([regional_prices[p] * regional_demand[p] for p in regional_prices])) / float(total_demand)
-            # print(weighted_average_price)
-
-            # Get a dict of all the residual supply indices, augmented with max network flows. 
-            network_residual_supply_indices = get_network_extended_residual_supply_indices(bidstack, regional_demand)
-            
-            timeseries[dt]['weighted_average_price'] = weighted_average_price
-            
-            timeseries[dt]['demand_ALL'] = total_demand
-            timeseries[dt]['datetime'] =  dt
-            timeseries[dt]['price'] =  regional_prices
-
-            for key in regional_demand:
-                timeseries[dt]['demand_'+key] = regional_demand[key]
-            for key in regional_prices:
-                timeseries[dt]['price_'+key] = regional_prices[key]
-                    
-
-            for state in STATES:
-                # Get a dict of all the bid-based market shares for this time period
-                generator_bid_shares = get_generator_bid_market_shares(bidstack, state)
-
-                # Get a dict of all the residual supply indices for this time period
-                residual_supply_indices = get_residual_supply_indices(bidstack, total_demand, state)
-
-                # Get a dict of all the pivotal supplier indices for this time period.
-                pivotal_supplier_indices = get_pivotal_supplier_indices(bidstack, total_demand, state)
-
-                
-                if state != "ALL":
-                    # Get a dict of all firm weighted offers
-                    firm_weighted_offer_prices = get_firm_volume_weighted_offer_price(bidstack, state)
-                    for firm in firm_weighted_offer_prices:
-                        timeseries[dt][firm.lower()+'_weighted_offer_price_'+state] = firm_weighted_offer_prices[firm]
-                    
-                    # Calculate average NERSI for all firms in the state.
-                    for firm in network_residual_supply_indices[state]:
-                        timeseries[dt][firm.lower()+'_nersi_'+state] = network_residual_supply_indices[state][firm]
-                    timeseries[dt]['average_nersi_'+state] = float(sum([network_residual_supply_indices[state][firm] for firm in network_residual_supply_indices[state]])) / float(len(network_residual_supply_indices[state]))
-                    timeseries[dt]['minimum_nersi_'+state] = min([network_residual_supply_indices[state][firm] for firm in network_residual_supply_indices[state]])
-
-                # Record results.
-                timeseries[dt]['hhi_bids_'+state] =  get_hhi(generator_bid_shares)
-                timeseries[dt]['entropy_bids_'+state] =  get_entropy(generator_bid_shares)
-                timeseries[dt]['four_firm_concentration_ratio_bids_'+state] = get_four_firm_concentration_ratio(generator_bid_shares)
-                timeseries[dt]['average_rsi_'+state] = float(sum([residual_supply_indices[firm] for firm in residual_supply_indices])) / float(len([f for f in residual_supply_indices]))
-                timeseries[dt]['minimum_rsi_'+state] = min([residual_supply_indices[firm] for firm in residual_supply_indices])
-                timeseries[dt]['sum_psi_'+state] = sum([pivotal_supplier_indices[firm] for firm in pivotal_supplier_indices])
-                
-                for firm in residual_supply_indices:
-                    timeseries[dt][firm.lower()+'_rsi_'+state] = residual_supply_indices[firm]
-                for firm in pivotal_supplier_indices:
-                    timeseries[dt][firm.lower()+'_psi_'+state] = pivotal_supplier_indices[firm]
-            
-
+    # print(timeseries[dt])
 
     print("Finished Processing Bidstack")
     return timeseries
@@ -738,5 +735,6 @@ if __name__=="__main__":
     start_date = pendulum.datetime(2018,1,1,12)
     end_date = pendulum.datetime(2018,1,10,12)
     timeseries = process(start_date, end_date)
+    print([key for key in timeseries])
     plot_data(timeseries)
     table_data(timeseries)
