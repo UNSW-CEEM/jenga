@@ -18,6 +18,7 @@ strsim = "*"
 scipy = "*"
 networkx = "*"
 ptable = "*"
+sklearn = "*"
 
 [dev-packages]
 pylint = "*"

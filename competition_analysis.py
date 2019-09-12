@@ -2,8 +2,10 @@ from application.model.bidstack import BidStack
 from application.model.dispatch import DispatchLoad
 from application.model.participants import ParticipantService
 from application.util.interpolation_timeseries import InterpolationTimeseries
+from application.machine_learning.random_forests import run_random_forest_price
 
 from application.graph.network_rsi import LMPFactory
+from application.util import pickling
 
 from scipy.stats.stats import pearsonr
 
@@ -13,6 +15,7 @@ import os
 import csv
 import pendulum
 import numpy as np
+import re
 
 
 from bokeh.layouts import column, gridplot
@@ -37,12 +40,13 @@ RESEARCH_HOURS = [0,6,12,18,24]
 
 STATES = ['QLD', 'NSW', 'VIC', 'SA', 'TAS', 'ALL']
 
-
+PICKLE_FILE = 'competition_timeseries.pkl'
 
 
 def process(start_date, end_date):
-    
-    timeseries = {}
+    timeseries = pickling.getFromPickle(PICKLE_FILE)
+    if not timeseries:
+        timeseries = {}
     timeseries = process_bidstacks(start_date, end_date, timeseries)
     timeseries = process_dispatch(start_date, end_date, timeseries)
     
@@ -123,6 +127,7 @@ def process_bidstacks(start_date, end_date, timeseries={}):
             network_residual_supply_indices = get_network_extended_residual_supply_indices(bidstack, regional_demand)
             
             timeseries[dt]['weighted_average_price'] = weighted_average_price
+            
             timeseries[dt]['demand_ALL'] = total_demand
             timeseries[dt]['datetime'] =  dt
             timeseries[dt]['price'] =  regional_prices
@@ -568,7 +573,15 @@ def plot_data(timeseries):
         if state != 'ALL':
             chart_pairs.append(['minimum_rsi_'+state, 'price_'+state])
             chart_pairs.append(['minimum_nersi_'+state, 'price_'+state])
+            chart_pairs.append(['hhi_bids_'+state, 'price_'+state])
+            chart_pairs.append(['hhi_dispatch_'+state, 'price_'+state])
+            chart_pairs.append(['entropy_bids_'+state, 'price_'+state])
+            chart_pairs.append(['entropy_dispatch_'+state, 'price_'+state])
             # chart_pairs.append(['average_nersi_'+state, 'price_'+state])
+
+
+    
+                   
 
     variables = {
         # 'demand_ALL':[],
@@ -605,6 +618,21 @@ def plot_data(timeseries):
     
     plots = []
 
+    for key in all_keys:
+        print("Key: ", key)
+
+    for key in all_keys:
+        if '_nersi_' in key and 'average' not in key and 'minimum' not in key:
+            m = re.search(r'(.*)_nersi_(\w+)', key)
+            firm = m.group(1)
+            state = m.group(2)
+            
+            chart_pairs.append([key, firm+'_weighted_offer_price_'+state])
+
+    # for state in STATES:
+    #     if state != 'ALL':
+    #         run_random_forest_price(timeseries, all_keys, state)
+
     # timeseries_chart = figure(x_axis_type="datetime", title="Spot Bids")
     # timeseries_chart.y_range = Range1d(start=0, end=1)
     # timeseries_chart.extra_y_ranges = {"price": Range1d(start=0, end=200)}
@@ -632,6 +660,7 @@ def plot_data(timeseries):
         x_series = []
         y_series = []
         for i in range(len(variables[pair[0]])):
+            # if pair[0] in variables and pair[1] in variables:
             if variables[pair[0]][i] and variables[pair[1]][i]:
                 x_series.append(variables[pair[0]][i])
                 y_series.append(variables[pair[1]][i])
@@ -640,15 +669,16 @@ def plot_data(timeseries):
         new_plot.yaxis.axis_label=pair[1]
         new_plot.circle(x_series, y_series)
         plots.append([new_plot])
-        print("\n")
+        # print("\n")
         
         if len(x_series) > 2:
             correlation = pearsonr(x_series, y_series)
-            print(pair[0]," Pearson Correlation with ",pair[1], correlation)
+            # print(pair[0]," Pearson Correlation with ",pair[1], correlation)
             correlation_table.add_row([pair[0], pair[1], correlation[0], correlation[1]])
         else:
-            print("Not enough data points to calculate pearson correlation between ", pair[0],'and', pair[1])
-        print("\n")
+            pass
+            # print("Not enough data points to calculate pearson correlation between ", pair[0],'and', pair[1])
+        # print("\n")
     
     # X/Y Scatter with residual supplier inidces of all firms. 
     for state in STATES:
@@ -689,6 +719,8 @@ def plot_data(timeseries):
     print(correlation_table)
     show(gridplot(plots, plot_width=1200, plot_height=600))  # open a browser
 
+    
+
 def table_data(timeseries):
     hhi_table = get_hhi_stat_table(timeseries)
     entropy_table = get_entropy_stat_table(timeseries)
@@ -702,11 +734,11 @@ def table_data(timeseries):
     print(psi_table)
     print(rsi_table)
     print(nersi_table)
-    
+
 
 if __name__=="__main__":
     start_date = pendulum.datetime(2018,1,1,12)
-    end_date = pendulum.datetime(2018,1,5,12)
+    end_date = pendulum.datetime(2018,12,30,12)
     timeseries = process(start_date, end_date)
     plot_data(timeseries)
     table_data(timeseries)
