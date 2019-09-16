@@ -125,6 +125,7 @@ def process_bidstacks(dt, timeseries={}):
 
     # Get a dict of all the residual supply indices, augmented with max network flows. 
     network_residual_supply_indices = get_network_extended_residual_supply_indices(bidstack, regional_demand)
+    get_network_extended_capacity_hhi = get_network_extended_capacity_hhi(bidstack, regional_demand)
     
     timeseries[dt]['weighted_average_price'] = weighted_average_price
     
@@ -149,7 +150,9 @@ def process_bidstacks(dt, timeseries={}):
         pivotal_supplier_indices = get_pivotal_supplier_indices(bidstack, total_demand, state)
 
         
+        
         if state != "ALL":
+            
             # Get a dict of all firm weighted offers
             firm_weighted_offer_prices = get_firm_volume_weighted_offer_price(bidstack, state)
             for firm in firm_weighted_offer_prices:
@@ -160,6 +163,9 @@ def process_bidstacks(dt, timeseries={}):
                 timeseries[dt][firm.lower()+'_nersi_'+state] = network_residual_supply_indices[state][firm]
             timeseries[dt]['average_nersi_'+state] = float(sum([network_residual_supply_indices[state][firm] for firm in network_residual_supply_indices[state]])) / float(len(network_residual_supply_indices[state]))
             timeseries[dt]['minimum_nersi_'+state] = min([network_residual_supply_indices[state][firm] for firm in network_residual_supply_indices[state]])
+
+            # Record network-extended HHI
+            timeseries[st]['nechhi_'+state] = get_network_extended_capacity_hhi[state]
 
         # Record results.
         timeseries[dt]['hhi_bids_'+state] =  get_hhi(generator_bid_shares)
@@ -325,6 +331,43 @@ def get_network_extended_residual_supply_indices(bidstack, regional_demand):
             rsi[state][firm] = float(total_volume[state] + extra_interstate_capacity - volumes[state][firm]) / float(regional_demand[state])
     return rsi
 
+def get_network_extended_capacity_hhi(bidstack, regional_demand):
+    """
+        The Network-Extended Capacity Herfindahl Firschman (NE-C-HHI) is HHI extended to use the excess capacity of other states as an additional competitior in a given trading node. 
+        'Capacity' means it is based on bids (rather than dispatch)
+        It produces a more relistic HHI that takes into account capacity available in other trading nodes.
+    """
+    participants = bidstack.getParticipants()
+    volumes = {state:{} for state in STATES if state != 'ALL'}
+    hhi = {}
+    total_volume = {state:0 for state in STATES if state != 'ALL'} 
+    network_flow = LMPFactory().get_australian_nem()
+
+    for participant in participants:
+        # If the participant is a firm (not transmission or distributed generation)
+        if "RT_" not in participant and "DG_" not in participant:
+            state = participant_service.get_state(participant)
+            volume = bidstack.getBid(participant).get_total_volume()
+            firm = participant_service.get_parent_firm(participant)
+            if state: #some participants dont have metadata.
+                volumes[state][firm] = volume if not firm in volumes[state] else volumes[state][firm] + volume
+                total_volume[state] += volume
+            
+    # Divide all by total volume to get the share rather than gross volume. 
+    for state in volumes:
+        # Determine spare capacities of all other states. 
+        spare_capacity = {}
+        for other_state in regional_demand:
+            if other_state != state:
+                spare_capacity[other_state] = max(total_volume[other_state] - regional_demand[other_state], 0)
+        # Pass to the nersi flow calculator to find additional interstate capacity available.
+        extra_interstate_capacity = network_flow.calculate_flow(state, spare_capacity)
+        # Calculate and record the rsi
+        volumes[state]['interconnectors'] = extra_interstate_capacity
+        total_available_volume = sum([volumes[state][firm] for firm in volumes[state]])
+        shares = {firm:volumes[state][firm]/total_available_volume for firm in volumes[state]}
+        hhi[state] = get_hhi(shares)
+    return hhi
     
 def get_hhi(shares):
     """
