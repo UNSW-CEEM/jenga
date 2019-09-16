@@ -16,6 +16,8 @@ import pendulum
 import numpy as np
 import re
 
+from application.util.pickling import getFromPickle, saveToPickle
+
 
 from bokeh.layouts import column, gridplot
 from bokeh.plotting import figure, show, output_file
@@ -39,14 +41,16 @@ RESEARCH_HOURS = [0,6,12,18,24]
 
 STATES = ['QLD', 'NSW', 'VIC', 'SA', 'TAS', 'ALL']
 
-
-
+PICKLE_FILENAME = 'competition_analysis.pkl'
 
 def process(start_date, end_date):
-    timeseries = {}
+    # Grabbing old results from saved file. If you change the metrics, delete this file first so that the metrics are updated. Otherwise new calcs will be skipped on any time period previously examined. 
+    saved_timeseries = getFromPickle(PICKLE_FILENAME)
+    timeseries = saved_timeseries if saved_timeseries else {}
+
     current = start_date
     while current < end_date:
-        if current.hour in RESEARCH_HOURS and current.minute == 0:
+        if current.hour in RESEARCH_HOURS and current.minute == 0 and current not in timeseries:
             timeseries[current] = {}
             timeseries = process_bidstacks(current, timeseries)
             timeseries = process_dispatch(current, timeseries)
@@ -54,6 +58,7 @@ def process(start_date, end_date):
             print(timeseries[current])
         current = current.add(minutes=30)
 
+    saveToPickle(timeseries, PICKLE_FILENAME)
     return timeseries
 
 def process_dispatch(dt, timeseries={}):

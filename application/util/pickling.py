@@ -1,4 +1,5 @@
 import pickle
+import os
 
 def saveToPickle(my_object, fileName):
     print("Pickling timeseries to file: "+str(fileName)+"...")
