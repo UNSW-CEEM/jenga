@@ -1,0 +1,36 @@
+﻿Technology Type,SRMC,LRMC,SRMC Source,LRMC Source,SRMC Notes,LRMC Notes
+Natural Gas Open Cycle Gas turbines (OCGT),89.81,103.37,"ACIL Tasman Fuel Resource, New Entry & Generation Costs in the NEM","ACIL Tasman Fuel Resource, New Entry & Generation Costs in the NEM",SW NSW P76,SW NSW 2019 P82
+Natural Gas Combined Cycle Gas Turbine (CCGT),41.47,61.87,"ACIL Tasman Fuel Resource, New Entry & Generation Costs in the NEM","ACIL Tasman Fuel Resource, New Entry & Generation Costs in the NEM",SW NSW P76,SW NSW 2019 P82
+Landfill Methane / Landfill Gas Compression Reciprocating Engine,88.6,103.37,Assumed Natural Gas as Lower Bound,Assumed Natural Gas as Lower Bound,,
+Water Hydro - Gravity,0,72.44,,https://www.irena.org/costs/Charts/Biomass,,Weighted estimate based on chart 'Typical LCOE and Cost Ranges for Electricity Generation' adjusted for inflation & currencies 
+Solar Photovoltaic Flat panel,0,60,,GenCost 2018,,Upper Range of Chart P28
+Bagasse Steam Sub-Critical,0,50,Assumed 0 as waste product,https://www.irena.org/costs/Charts/Biomass,,Estimate Based on Chart - 'Rest of World' Bagasse LCOE
+Wind Wind - Onshore,2.67,70,AEMO Costs and Technical Parameter Review,Gencost 2018,P108,"Upper Range of Chart, P28"
+Coal Seam Methane Compression Reciprocating Engine,88.6,103.37,Assumed Natural Gas as Lower Bound,Assumed Natural Gas as Lower Bound,,
+Solar Hydro - Gravity,0,72.44,,https://www.irena.org/costs/Charts/Biomass,,Weighted estimate based on chart 'Typical LCOE and Cost Ranges for Electricity Generation' adjusted for inflation & currencies 
+Landfill Methane / Landfill Gas Spark Ignition Reciprocating Engine,0,103.37,Assumed 0 as waste gas,Assumed Natural Gas as Lower Bound,,
+Brown Coal Steam Sub-Critical,6,105,Tony Wood ANU ECI Technology Update,GenCost 2018,p8,Upper range of Chart P28
+Black Coal Steam Sub-Critical,18,120,Tony Wood ANU ECI Technology Update,GenCost 2018,p8,Upper Range of Chart P28
+Kerosene Open Cycle Gas turbines (OCGT),88.6,103.37,Assumed Natural Gas as Lower Bound,Assumed Natural Gas as Lower Bound,,
+Natural Gas / Fuel Oil Steam Sub-Critical,88.6,103.37,Assumed Natural Gas as Lower Bound,Assumed Natural Gas as Lower Bound,,
+Solar Photovoltaic Tracking Flat panel,0,60,,GenCost 2018,,Upper Range of Chart P28
+Coal Seam Methane Open Cycle Gas turbines (OCGT),88.6,103.37,Assumed Natural Gas as Lower Bound,Assumed Natural Gas as Lower Bound,,
+Black Coal Steam Super Critical,9.51,46.75,"ACIL Tasman Fuel Resource, New Entry & Generation Costs in the NEM","ACIL Tasman Fuel Resource, New Entry & Generation Costs in the NEM",SW NSW P76,SW NSW 2019 P82
+Water Pump Storage,0,72.44,,https://www.irena.org/costs/Charts/Biomass,,Weighted estimate based on chart 'Typical LCOE and Cost Ranges for Electricity Generation' adjusted for inflation & currencies 
+Solar  Photovoltaic Flat Panel,0,60,,GenCost 2018,,Upper Range of Chart P28
+Sewerage / Waste Water Compression Reciprocating Engine,0,0,,,,
+Natural Gas Steam Sub-Critical,88.6,103.37,Assumed Natural Gas as Lower Bound,Assumed Natural Gas as Lower Bound,,
+Waste Coal Mine Gas Compression Reciprocating Engine,0,103.37,Assumed 0 because waste gas,Assumed Natural Gas as Lower Bound,,
+Waste Coal Mine Gas Spark Ignition Reciprocating Engine,0,103.37,Assumed 0 because waste gas,Assumed Natural Gas as Lower Bound,,
+Natural Gas / Diesel Open Cycle Gas turbines (OCGT),88.6,103.37,"ACIL Tasman Fuel Resource, New Entry & Generation Costs in the NEM","ACIL Tasman Fuel Resource, New Entry & Generation Costs in the NEM",SW NSW P76,SW NSW 2019 P82
+Natural Gas Compression Reciprocating Engine,88.6,103.37,Assumed Natural Gas as Lower Bound,Assumed Natural Gas as Lower Bound,,
+Diesel Compression Reciprocating Engine,88.6,103.37,Assumed Natural Gas as Lower Bound,Assumed Natural Gas as Lower Bound,,
+Diesel Open Cycle Gas turbines (OCGT),88.6,103.37,Assumed Natural Gas as Lower Bound,Assumed Natural Gas as Lower Bound,,
+Grid Battery,0,60,,GenCost 2018,,Subtracting Wind from Wind+Battery P28
+Wind Battery and Inverter,0,130,,GenCost 2018,,Upper Range of Chart P28
+Solar Solar Thermal,0,164,,Lazard 2013,,Taken from Climate Council Aging Fleet Report - Known to be close to domestic figures
+Natural Gas Spark Ignition Reciprocating Engine,88.6,103.37,Assumed Natural Gas as Lower Bound,Assumed Natural Gas as Lower Bound,,
+Water Run of River,0,72.44,,https://www.irena.org/costs/Charts/Biomass,,Weighted estimate based on chart 'Typical LCOE and Cost Ranges for Electricity Generation' adjusted for inflation & currencies 
+Coal Seam Methane Spark Ignition Reciprocating Engine,88.6,103.37,Assumed Natural Gas as Lower Bound,Assumed Natural Gas as Lower Bound,,
+Sewerage / Waste Water Pump Storage,0,72.44,Assumed 0 as waste input,Assumed same as hydro,,
+Bagasse Steam Super Critical,0,50,Assumed 0 as waste product,https://www.irena.org/costs/Charts/Biomass,,Estimate Based on Chart - 'Rest of World' Bagasse LCOE
