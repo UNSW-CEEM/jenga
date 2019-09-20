@@ -69,7 +69,7 @@ def process_dispatch(start_date, end_date, timeseries={}):
                 for dispatch in dispatches:
                     participant_state = participant_service.get_state(dispatch.DUID)
                     if participant_state == state or state == 'ALL':
-                        if "RT_" not in dispatch.DUID:
+                        if "RT_" not in dispatch.DUID: # Regional Reserve Trader units - not applicable and their bids ruin everything.
                             firm = participant_service.get_parent_firm(dispatch.DUID)
                             firm_dispatch[firm] = dispatch.TOTALCLEARED if not firm in firm_dispatch else firm_dispatch[firm] + dispatch.TOTALCLEARED
                             total_dispatch += dispatch.TOTALCLEARED
@@ -189,7 +189,7 @@ def get_firm_volume_weighted_offer_price(bidstack, state):
     for participant in participants:
         participant_state = participant_service.get_state(participant)
         if participant_state == state:
-            if "RT_" not in participant:
+            if "RT_" not in participant: # Regional Reserve Trader units - not applicable and their bids ruin everything.
                 bid = bidstack.getBid(participant) 
                 firm = participant_service.get_parent_firm(participant)
                 for band in range(1,9):
@@ -222,7 +222,7 @@ def get_generator_bid_market_shares(bidstack, state='ALL'):
         participant_state = participant_service.get_state(participant)
         # If the participant is in the desired state, or if we want all states...
         if participant_state == state or state == 'ALL':
-            if "RT_" not in participant:
+            if "RT_" not in participant: # Regional Reserve Trader units - not applicable and their bids ruin everything.
                 bid = bidstack.getBid(participant) 
                 firm = participant_service.get_parent_firm(participant)
                 for band in range(1,9):
@@ -247,7 +247,7 @@ def get_pivotal_supplier_indices(bidstack, demand, state='ALL'):
         participant_state = participant_service.get_state(participant)
         # If the participant is in the desired state, or if we want all states...
         if participant_state == state or state == 'ALL':
-            if "RT_" not in participant:
+            if "RT_" not in participant: # Regional Reserve Trader units - not applicable and their bids ruin everything.
                 bid = bidstack.getBid(participant)
                 firm = participant_service.get_parent_firm(participant)
                 for band in range(1,9):
@@ -276,7 +276,7 @@ def get_residual_supply_indices(bidstack, demand, state='ALL'):
         participant_state = participant_service.get_state(participant)
         # If the participant is in the desired state, or if we want all states...
         if participant_state == state or state == 'ALL':
-            if "RT_" not in participant:
+            if "RT_" not in participant: # Regional Reserve Trader units - not applicable and their bids ruin everything.
                 bid = bidstack.getBid(participant) 
                 firm = participant_service.get_parent_firm(participant)
                 for band in range(1,9):
@@ -304,7 +304,7 @@ def get_network_extended_residual_supply_indices(bidstack, regional_demand):
 
     for participant in participants:
         # If the participant is a firm (not transmission or distributed generation)
-        if "RT_" not in participant and "DG_" not in participant:
+        if "RT_" not in participant and "DG_" not in participant: # Regional Reserve Trader units - not applicable and their bids ruin everything.
             state = participant_service.get_state(participant)
             volume = bidstack.getBid(participant).get_total_volume()
             firm = participant_service.get_parent_firm(participant)
@@ -363,7 +363,7 @@ def settle(bidstack):
     srmc_bids = []
     # Grab the simple bids of each participant
     for participant in participants:
-        if "RT_" not in participant: #there are a lot of 'RT_' bids that I suspect are Regional Transmission? They mess up everything. High volumes (like the entire NEM * 2-3)
+        if "RT_" not in participant: # Regional Reserve Trader units - not applicable and their bids ruin everything. High volumes (like the entire NEM * 2-3)
             srmc = participant_service.get_srmc(participant)
             lrmc = participant_service.get_lrmc(participant)
             bid = bidstack.getBid(participant) 

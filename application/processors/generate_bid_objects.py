@@ -7,11 +7,8 @@ import pendulum
 # dates = BidPerOffer.objects().distinct('INTERVAL_DATETIME')
 # dates = sorted(dates)
 
-if __name__ == "__main__":
+def generate(start_date, end_date):
     counter = 0
-
-    start_date = pendulum.datetime(2017,1,1,0, tz="Australia/Brisbane")
-    end_date = pendulum.datetime(2018,1,1,0, tz="Australia/Brisbane")
     date = start_date
     # for date in dates:
     while date < end_date:
@@ -27,4 +24,11 @@ if __name__ == "__main__":
             print("Bidstack already exists for ", date)
         # counter += 1
         date = date.add(minutes=30)
+
+
+if __name__ == "__main__":
+    start_date = pendulum.datetime(2016,12,1,0, tz="Australia/Brisbane")
+    end_date = pendulum.datetime(2017,1,1,0, tz="Australia/Brisbane")
+    generate(start_date, end_date)
+    
 

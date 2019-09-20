@@ -21,5 +21,5 @@ if __name__ == "__main__":
     market.set_transmission('VIC', 'TAS', 478, "Basslink VIC->TAS")
     market.set_transmission('VIC', 'SA', 600, "Heywood Interconnector VIC->SA")
     market.set_transmission('SA', 'VIC', 500, "Heywood Interconnector SA->VIC")
-    market.set_transmission('VIC', 'SA', 820, "Murraylink VIC->SA")
+    market.set_transmission('VIC', 'SA', 220, "Murraylink VIC->SA")
     market.set_transmission('SA', 'VIC', 200, "Murraylink SA->VIC")

@@ -6,8 +6,9 @@ from application.model.demand import Demand
 from application.model.price import Price
 
 from string import digits
+import requests
 
-if __name__== "__main__":
+def parse_all():
     remove_digits = str.maketrans('', '', digits)
 
     path = os.path.join('data', 'nem_spot_update')
@@ -31,3 +32,27 @@ if __name__== "__main__":
                         price_type ='AEMO_SPOT'
                     )
                     price.save()
+
+def download():
+    regions = ['QLD', 'NSW', 'VIC', 'SA', 'TAS']
+    years = [1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019]
+    # years = [2012]
+    months = ["01","02","03","04","05","06","07","08","09","10","11","12"]
+    for year in years:
+        for month in months:
+            for region in regions:
+                print(year, month, region)
+                fname = "PRICE_AND_DEMAND_"+str(year)+month+"_"+region+"1.csv"
+                url = "https://www.aemo.com.au/aemo/data/nem/priceanddemand/"+fname
+                
+                r = requests.get(url)
+                # print(r.content)
+                if r.status_code == 200:
+                    with open(os.path.join('data', 'nem_spot', fname), 'wb') as f:
+                        f.write(r.content)
+                else:
+                    print("Could not download", url)
+
+if __name__== "__main__":
+    download()
+    parse_all()

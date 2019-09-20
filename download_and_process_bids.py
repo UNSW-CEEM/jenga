@@ -3,6 +3,7 @@ import os
 import pendulum
 import application.processors.period_offers as process_period_offers
 import application.processors.day_offers as process_day_offers
+import application.processors.generate_bid_objects as bid_objects
 import application.model.processed_files as processed_files
 
 def check_file_exists(path, fname):
@@ -70,19 +71,27 @@ if __name__=="__main__":
 
     raw_data_cache = 'data'
 
-    years = [2017]
-    months = [6,7,8,9,10,11,12]
+    years = [2015]
+    months = [1,2,3,4,5,6,7,8,9,10,11,12]
 
+    # Download the relevant files. 
     for year in years:
         for month in months:
             download_period_offers(year, month)
             download_day_offers(year, month)
 
-
+    # Process the downloaded files
     for year in years:
         for month in months:
             run_period_offers(year, month)
             run_day_offers(year, month)
+    
+    # Generate the bid objects.
+    for year in years:
+        for month in months:
+            start_date = pendulum.datetime(year, month, 1,0,0,0)
+            end_date = pendulum.instance(start_date).end_of('month')
+            bid_objects.generate(start_date, end_date)
         
        
 

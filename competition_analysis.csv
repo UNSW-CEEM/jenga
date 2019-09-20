@@ -1,0 +1,105 @@
+
+hhi
+Metric, Label, Value
+nechhi_QLD, % Highly, 5.694444444444445
+nechhi_QLD, % Moderately, 94.30555555555556
+hhi_bids_QLD, % Highly, 82.08333333333333
+hhi_bids_QLD, % Moderately, 17.916666666666668
+nechhi_NSW, % Highly, 0.0
+nechhi_NSW, % Moderately, 100.0
+hhi_bids_NSW, % Highly, 0.0
+hhi_bids_NSW, % Moderately, 100.0
+nechhi_VIC, % Highly, 0.0
+nechhi_VIC, % Moderately, 100.0
+hhi_bids_VIC, % Highly, 4.166666666666667
+hhi_bids_VIC, % Moderately, 95.83333333333333
+nechhi_SA, % Highly, 0.0
+nechhi_SA, % Moderately, 59.861111111111114
+hhi_bids_SA, % Highly, 0.7638888888888888
+hhi_bids_SA, % Moderately, 90.90277777777777
+nechhi_TAS, % Highly, 100.0
+nechhi_TAS, % Moderately, 0.0
+hhi_bids_TAS, % Highly, 100.0
+hhi_bids_TAS, % Moderately, 0.0
+hhi_bids_ALL, % Highly, 0.0
+hhi_bids_ALL, % Moderately, 0.0
+hhi_dispatch_QLD, % Highly, 98.05555555555556
+hhi_dispatch_QLD, % Moderately, 0.06944444444444445
+hhi_dispatch_NSW, % Highly, 0.0
+hhi_dispatch_NSW, % Moderately, 71.04166666666667
+hhi_dispatch_VIC, % Highly, 0.0
+hhi_dispatch_VIC, % Moderately, 42.291666666666664
+hhi_dispatch_SA, % Highly, 0.0
+hhi_dispatch_SA, % Moderately, 24.86111111111111
+hhi_dispatch_TAS, % Highly, 0.0
+hhi_dispatch_TAS, % Moderately, 1.875
+hhi_dispatch_ALL, % Highly, 0.0
+hhi_dispatch_ALL, % Moderately, 1.6666666666666667
+
+entropy
+Metric, Label, Value
+entropy_bids_QLD, % Concentrated, 100.0
+entropy_bids_NSW, % Concentrated, 100.0
+entropy_bids_VIC, % Concentrated, 100.0
+entropy_bids_SA, % Concentrated, 100.0
+entropy_bids_TAS, % Concentrated, 100.0
+entropy_bids_ALL, % Concentrated, 0.0
+entropy_dispatch_QLD, % Concentrated, 100.0
+entropy_dispatch_NSW, % Concentrated, 99.02777777777777
+entropy_dispatch_VIC, % Concentrated, 92.08333333333333
+entropy_dispatch_SA, % Concentrated, 71.45833333333333
+entropy_dispatch_TAS, % Concentrated, 28.819444444444443
+entropy_dispatch_ALL, % Concentrated, 28.055555555555557
+
+four_firm
+Metric, Label, Value
+four_firm_concentration_ratio_bids_QLD, % Highly, 96.52777777777777
+four_firm_concentration_ratio_bids_QLD, % Moderately, 0.0
+four_firm_concentration_ratio_bids_NSW, % Highly, 94.58333333333333
+four_firm_concentration_ratio_bids_NSW, % Moderately, 0.0
+four_firm_concentration_ratio_bids_VIC, % Highly, 74.72222222222223
+four_firm_concentration_ratio_bids_VIC, % Moderately, 0.0
+four_firm_concentration_ratio_bids_SA, % Highly, 1.5972222222222223
+four_firm_concentration_ratio_bids_SA, % Moderately, 0.0
+four_firm_concentration_ratio_bids_TAS, % Highly, 100.0
+four_firm_concentration_ratio_bids_TAS, % Moderately, 0.0
+four_firm_concentration_ratio_bids_ALL, % Highly, 0.0
+four_firm_concentration_ratio_bids_ALL, % Moderately, 0.0
+four_firm_concentration_ratio_dispatch_QLD, % Highly, 98.05555555555556
+four_firm_concentration_ratio_dispatch_QLD, % Moderately, 0.0
+four_firm_concentration_ratio_dispatch_NSW, % Highly, 4.930555555555555
+four_firm_concentration_ratio_dispatch_NSW, % Moderately, 0.0
+four_firm_concentration_ratio_dispatch_VIC, % Highly, 0.0
+four_firm_concentration_ratio_dispatch_VIC, % Moderately, 0.0
+four_firm_concentration_ratio_dispatch_SA, % Highly, 0.0
+four_firm_concentration_ratio_dispatch_SA, % Moderately, 0.0
+four_firm_concentration_ratio_dispatch_TAS, % Highly, 0.0
+four_firm_concentration_ratio_dispatch_TAS, % Moderately, 0.0
+four_firm_concentration_ratio_dispatch_ALL, % Highly, 0.0
+four_firm_concentration_ratio_dispatch_ALL, % Moderately, 0.0
+
+psi
+Metric, Label, Value
+sum_psi_QLD, % w/ PSI, 100.0
+sum_psi_NSW, % w/ PSI, 100.0
+sum_psi_VIC, % w/ PSI, 100.0
+sum_psi_SA, % w/ PSI, 100.0
+sum_psi_TAS, % w/ PSI, 100.0
+sum_psi_ALL, % w/ PSI, 0.0
+
+rsi
+Metric, Label, Value
+minimum_rsi_QLD, % Under, 100.0
+minimum_rsi_NSW, % Under, 100.0
+minimum_rsi_VIC, % Under, 100.0
+minimum_rsi_SA, % Under, 100.0
+minimum_rsi_TAS, % Under, 100.0
+minimum_rsi_ALL, % Under, 0.0
+
+nersi
+Metric, Label, Value
+minimum_nersi_QLD, % Under, 3.125
+minimum_nersi_NSW, % Under, 0.0
+minimum_nersi_VIC, % Under, 0.0
+minimum_nersi_SA, % Under, 0.0
+minimum_nersi_TAS, % Under, 99.93055555555556

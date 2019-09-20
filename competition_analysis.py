@@ -5,25 +5,18 @@ from application.util.interpolation_timeseries import InterpolationTimeseries
 from application.machine_learning.random_forests import run_random_forest_price
 
 from application.graph.network_rsi import LMPFactory
+from competition_modelling import tables, plotting
 
-from scipy.stats.stats import pearsonr
 
-from prettytable import PrettyTable
 
 import os
 import csv
 import pendulum
 import numpy as np
-import re
+
+from competition_modelling import config
 
 from application.util.pickling import getFromPickle, saveToPickle
-
-
-from bokeh.layouts import column, gridplot
-from bokeh.plotting import figure, show, output_file
-from bokeh.models import LinearAxis, Range1d
-
-from palettable.matplotlib import Plasma_20 as palette
 
 participant_service = ParticipantService()
 
@@ -38,12 +31,17 @@ from similarity.qgram import QGram
 qgram = QGram(2)
 
 RESEARCH_HOURS = [0,6,12,18,24]
+# RESEARCH_HOURS = [12]
 
-STATES = ['QLD', 'NSW', 'VIC', 'SA', 'TAS', 'ALL']
+
 
 PICKLE_FILENAME = 'competition_analysis.pkl'
 
 def process(start_date, end_date):
+    """
+        the 'main' function here
+        loops through all the required time periods, generates results. 
+    """
     # Grabbing old results from saved file. If you change the metrics, delete this file first so that the metrics are updated. Otherwise new calcs will be skipped on any time period previously examined. 
     saved_timeseries = getFromPickle(PICKLE_FILENAME)
     timeseries = saved_timeseries if saved_timeseries else {}
@@ -55,7 +53,7 @@ def process(start_date, end_date):
             timeseries = process_bidstacks(current, timeseries)
             timeseries = process_dispatch(current, timeseries)
             print(current)
-            print(timeseries[current])
+            # print(timeseries[current])
         current = current.add(minutes=30)
 
     saveToPickle(timeseries, PICKLE_FILENAME)
@@ -63,14 +61,14 @@ def process(start_date, end_date):
 
 def process_dispatch(dt, timeseries={}):
 
-    print("Dispatch Analysis", dt)
+    # print("Dispatch Analysis", dt)
     query = DispatchLoad.objects(SETTLEMENTDATE=dt).fields(DUID=1, TOTALCLEARED=1)
     dispatches = [d for d in query]
     # print(dispatches)
     # Get the dispatch of each firm in the market. 
     firm_dispatch = {}
     total_dispatch = 0
-    for state in STATES:
+    for state in config.STATES:
         for dispatch in dispatches:
             participant_state = participant_service.get_state(dispatch.DUID)
             if participant_state == state or state == 'ALL':
@@ -95,77 +93,50 @@ def process_dispatch(dt, timeseries={}):
 
 def process_bidstacks(dt, timeseries={}):
     """ Derives competition indicators from bids submitted by generators.  """
-
-    print("Processing Bidstack")
     # Get bidstacks for every time period. 
     bidstack = BidStack.objects.get(trading_period=dt)
-    print('Retrieved Bidstacks', bidstack)
-    
-    # Get the trading period label. 
-    
-    
     # Filter based on hour so we don't process tonnes of them
     timeseries[dt] = {} if not dt in timeseries else timeseries[dt]
-    print("Bid Analysis", dt)
-    # Grab the bids and order in economic dispatch order. 
-    
-    # simple_bids, srmc_bids, lrmc_bids = settle(bidstack)
-    # dt = pendulum.instance(bidstack.trading_period)
     # Grab demand data. 
     demand_req = Demand.objects(date_time=dt)
     regional_demand = {d.region:d.demand for d in demand_req}
     total_demand = int(float(sum([regional_demand[region] for region in regional_demand])))
-    
     # Grab price data
     price_req = Price.objects(date_time = dt, price_type='AEMO_SPOT')
     regional_prices = {p.region: p.price for p in price_req}
-    # print(regional_prices)
-    weighted_average_price = float(sum([regional_prices[p] * regional_demand[p] for p in regional_prices])) / float(total_demand)
-    # print(weighted_average_price)
-
     # Get a dict of all the residual supply indices, augmented with max network flows. 
     network_residual_supply_indices = get_network_extended_residual_supply_indices(bidstack, regional_demand)
-    get_network_extended_capacity_hhi = get_network_extended_capacity_hhi(bidstack, regional_demand)
-    
-    timeseries[dt]['weighted_average_price'] = weighted_average_price
-    
+    network_extended_capacity_hhi = get_network_extended_capacity_hhi(bidstack, regional_demand)
+    # Record price and demand. 
+    timeseries[dt]['weighted_average_price'] = float(sum([regional_prices[p] * regional_demand[p] for p in regional_prices])) / float(total_demand)
     timeseries[dt]['demand_ALL'] = total_demand
-    timeseries[dt]['datetime'] =  dt
     timeseries[dt]['price'] =  regional_prices
-
     for key in regional_demand:
         timeseries[dt]['demand_'+key] = regional_demand[key]
     for key in regional_prices:
         timeseries[dt]['price_'+key] = regional_prices[key]
             
 
-    for state in STATES:
+    for state in config.STATES:
         # Get a dict of all the bid-based market shares for this time period
         generator_bid_shares = get_generator_bid_market_shares(bidstack, state)
-
         # Get a dict of all the residual supply indices for this time period
         residual_supply_indices = get_residual_supply_indices(bidstack, total_demand, state)
-
         # Get a dict of all the pivotal supplier indices for this time period.
         pivotal_supplier_indices = get_pivotal_supplier_indices(bidstack, total_demand, state)
-
-        
-        
+        # Loop through every state and analyse / record
         if state != "ALL":
-            
             # Get a dict of all firm weighted offers
             firm_weighted_offer_prices = get_firm_volume_weighted_offer_price(bidstack, state)
             for firm in firm_weighted_offer_prices:
                 timeseries[dt][firm.lower()+'_weighted_offer_price_'+state] = firm_weighted_offer_prices[firm]
-            
             # Calculate average NERSI for all firms in the state.
             for firm in network_residual_supply_indices[state]:
                 timeseries[dt][firm.lower()+'_nersi_'+state] = network_residual_supply_indices[state][firm]
             timeseries[dt]['average_nersi_'+state] = float(sum([network_residual_supply_indices[state][firm] for firm in network_residual_supply_indices[state]])) / float(len(network_residual_supply_indices[state]))
             timeseries[dt]['minimum_nersi_'+state] = min([network_residual_supply_indices[state][firm] for firm in network_residual_supply_indices[state]])
-
             # Record network-extended HHI
-            timeseries[st]['nechhi_'+state] = get_network_extended_capacity_hhi[state]
+            timeseries[dt]['nechhi_'+state] = network_extended_capacity_hhi[state]
 
         # Record results.
         timeseries[dt]['hhi_bids_'+state] =  get_hhi(generator_bid_shares)
@@ -175,14 +146,12 @@ def process_bidstacks(dt, timeseries={}):
         timeseries[dt]['minimum_rsi_'+state] = min([residual_supply_indices[firm] for firm in residual_supply_indices])
         timeseries[dt]['sum_psi_'+state] = sum([pivotal_supplier_indices[firm] for firm in pivotal_supplier_indices])
         
+        # Record RSI and PSI for each firm. 
         for firm in residual_supply_indices:
             timeseries[dt][firm.lower()+'_rsi_'+state] = residual_supply_indices[firm]
         for firm in pivotal_supplier_indices:
             timeseries[dt][firm.lower()+'_psi_'+state] = pivotal_supplier_indices[firm]
             
-    # print(timeseries[dt])
-
-    print("Finished Processing Bidstack")
     return timeseries
 
 
@@ -224,7 +193,7 @@ def get_generator_bid_market_shares(bidstack, state='ALL'):
 
     for participant in participants:
         participant_state = participant_service.get_state(participant)
-        # If the participant is in the desired state, or if we want all states...
+        # If the participant is in the desired state, or if we want all config.states...
         if participant_state == state or state == 'ALL':
             if "RT_" not in participant:
                 bid = bidstack.getBid(participant) 
@@ -249,7 +218,7 @@ def get_pivotal_supplier_indices(bidstack, demand, state='ALL'):
 
     for participant in participants:
         participant_state = participant_service.get_state(participant)
-        # If the participant is in the desired state, or if we want all states...
+        # If the participant is in the desired state, or if we want all config.states...
         if participant_state == state or state == 'ALL':
             if "RT_" not in participant:
                 bid = bidstack.getBid(participant)
@@ -278,7 +247,7 @@ def get_residual_supply_indices(bidstack, demand, state='ALL'):
 
     for participant in participants:
         participant_state = participant_service.get_state(participant)
-        # If the participant is in the desired state, or if we want all states...
+        # If the participant is in the desired state, or if we want all config.states...
         if participant_state == state or state == 'ALL':
             if "RT_" not in participant:
                 bid = bidstack.getBid(participant) 
@@ -301,9 +270,9 @@ def get_network_extended_residual_supply_indices(bidstack, regional_demand):
         It hus produces a more relistic RSI that takes into account capacity available in other trading nodes.
     """
     participants = bidstack.getParticipants()
-    volumes = {state:{} for state in STATES if state != 'ALL'}
-    rsi = {state:{} for state in STATES if state != 'ALL'}
-    total_volume = {state:0 for state in STATES if state != 'ALL'} 
+    volumes = {state:{} for state in config.STATES if state != 'ALL'}
+    rsi = {state:{} for state in config.STATES if state != 'ALL'}
+    total_volume = {state:0 for state in config.STATES if state != 'ALL'} 
     network_flow = LMPFactory().get_australian_nem()
 
     for participant in participants:
@@ -319,7 +288,7 @@ def get_network_extended_residual_supply_indices(bidstack, regional_demand):
     # Divide all by total volume to get the share rather than gross volume. 
     for state in volumes:
         for firm in volumes[state]:
-            # Determine spare capacities of all other states. 
+            # Determine spare capacities of all other config.states. 
             spare_capacity = {}
             for other_state in regional_demand:
                 if other_state != state:
@@ -333,14 +302,14 @@ def get_network_extended_residual_supply_indices(bidstack, regional_demand):
 
 def get_network_extended_capacity_hhi(bidstack, regional_demand):
     """
-        The Network-Extended Capacity Herfindahl Firschman (NE-C-HHI) is HHI extended to use the excess capacity of other states as an additional competitior in a given trading node. 
+        The Network-Extended Capacity Herfindahl Firschman (NE-C-HHI) is HHI extended to use the excess capacity of other config.states as an additional competitior in a given trading node. 
         'Capacity' means it is based on bids (rather than dispatch)
         It produces a more relistic HHI that takes into account capacity available in other trading nodes.
     """
     participants = bidstack.getParticipants()
-    volumes = {state:{} for state in STATES if state != 'ALL'}
+    volumes = {state:{} for state in config.STATES if state != 'ALL'}
     hhi = {}
-    total_volume = {state:0 for state in STATES if state != 'ALL'} 
+    total_volume = {state:0 for state in config.STATES if state != 'ALL'} 
     network_flow = LMPFactory().get_australian_nem()
 
     for participant in participants:
@@ -355,7 +324,7 @@ def get_network_extended_capacity_hhi(bidstack, regional_demand):
             
     # Divide all by total volume to get the share rather than gross volume. 
     for state in volumes:
-        # Determine spare capacities of all other states. 
+        # Determine spare capacities of all other config.states. 
         spare_capacity = {}
         for other_state in regional_demand:
             if other_state != state:
@@ -439,350 +408,14 @@ def get_strike_price(bids, demand):
             return bid['price']
     return 14000
 
-def get_hhi_stat_table(timeseries):
-    """Extracts a number of metrics related to HHI"""
-
-    table = PrettyTable()
-    table.field_names = ["Metric","Label", "Value"]
-
-    MODERATELY_CONCENTRATED = 1500
-    HIGHLY_CONCENTRATED = 2500
-    total_count = {}
-    moderately = {}
-    highly = {}
-    for t in timeseries:
-        for key in timeseries[t]:
-            if 'hhi_' in key:
-                total_count[key] = 1 if key not in total_count else total_count[key] + 1
-                moderately[key] = 0 if key not in moderately else moderately[key]
-                highly[key] = 0 if key not in highly else highly[key]
-                if timeseries[t][key] > HIGHLY_CONCENTRATED:
-                    highly[key] += 1
-                elif timeseries[t][key] > MODERATELY_CONCENTRATED:
-                    moderately[key] += 1
-    
-    for key in total_count:
-        table.add_row([key, "% Highly", 100.0 * float(highly[key])/ float(total_count[key])])
-        table.add_row([key, "% Moderately", 100.0 * float(moderately[key])/ float(total_count[key])])
-        # table.add_row([key, "Count Moderately", moderately[key]])
-        # table.add_row([key, "Count Highly", highly[key]])
-        # table.add_row([key, "Count Total", total_count[key] ])
-    return table
 
 
-def get_entropy_stat_table(timeseries):
-    """Extracts a number of metrics related to entropy"""
-
-    table = PrettyTable()
-    table.field_names = ["Metric","Label", "Value"]
-
-    THRESHOLD = 3.32
-    HIGHLY_CONCENTRATED = 2500
-    total_count = {}
-    concentrated = {}
-    
-    for t in timeseries:
-        for key in timeseries[t]:
-            if 'entropy_' in key:
-                total_count[key] = 1 if key not in total_count else total_count[key] + 1
-                concentrated[key] = 0 if key not in concentrated else concentrated[key]
-                if timeseries[t][key] < THRESHOLD:
-                    concentrated[key] += 1
-    
-    for key in total_count:
-        table.add_row([key, "% Concentrated", 100.0 * float(concentrated[key])/ float(total_count[key])])
-    return table
-
-def get_four_firm_stat_table(timeseries):
-    """Extracts a number of metrics related to 4-Firm Concn Ratio"""
-
-    table = PrettyTable()
-    table.field_names = ["Metric","Label", "Value"]
-
-    MODERATELY_CONCENTRATED = 50
-    HIGHLY_CONCENTRATED = 0.8
-    total_count = {}
-    moderately = {}
-    highly = {}
-    for t in timeseries:
-        for key in timeseries[t]:
-            if 'four_firm' in key:
-                total_count[key] = 1 if key not in total_count else total_count[key] + 1
-                moderately[key] = 0 if key not in moderately else moderately[key]
-                highly[key] = 0 if key not in highly else highly[key]
-                if timeseries[t][key] > HIGHLY_CONCENTRATED:
-                    highly[key] += 1
-                elif timeseries[t][key] > MODERATELY_CONCENTRATED:
-                    moderately[key] += 1
-    
-    for key in total_count:
-        table.add_row([key, "% Highly", 100.0 * float(highly[key])/ float(total_count[key])])
-        table.add_row([key, "% Moderately", 100.0 * float(moderately[key])/ float(total_count[key])])
-      
-    return table
-
-def get_rsi_stat_table(timeseries):
-    """Extracts a number of metrics related to RSI"""
-
-    table = PrettyTable()
-    table.field_names = ["Metric","Label", "Value"]
-
-    THRESHOLD = 1
-    total_count = {}
-    under_threshold = {}
-    
-    for t in timeseries:
-        for key in timeseries[t]:
-            if 'minimum_rsi' in key:
-                total_count[key] = 1 if key not in total_count else total_count[key] + 1
-                under_threshold[key] = 0 if key not in under_threshold else under_threshold[key]
-                if timeseries[t][key] < THRESHOLD:
-                    under_threshold[key] += 1
-                
-    
-    for key in total_count:
-        table.add_row([key, "% Under", 100.0 * float(under_threshold[key])/ float(total_count[key])])
-    return table
-
-def get_nersi_stat_table(timeseries):
-    """Extracts a number of metrics related to NERSI"""
-
-    table = PrettyTable()
-    table.field_names = ["Metric","Label", "Value"]
-
-    THRESHOLD = 1
-    total_count = {}
-    under_threshold = {}
-    
-    for t in timeseries:
-        for key in timeseries[t]:
-            if 'minimum_nersi' in key:
-                total_count[key] = 1 if key not in total_count else total_count[key] + 1
-                under_threshold[key] = 0 if key not in under_threshold else under_threshold[key]
-                if timeseries[t][key] < THRESHOLD:
-                    under_threshold[key] += 1
-                
-    
-    for key in total_count:
-        table.add_row([key, "% Under", 100.0 * float(under_threshold[key])/ float(total_count[key])])
-    return table
-
-def get_psi_stat_table(timeseries):
-    """Extracts a number of metrics related to PSI"""
-
-    table = PrettyTable()
-    table.field_names = ["Metric","Label", "Value"]
-
-    total_count = {}
-    some_over = {}
-    
-    for t in timeseries:
-        for key in timeseries[t]:
-            if 'sum_psi' in key:
-                total_count[key] = 1 if key not in total_count else total_count[key] + 1
-                some_over[key] = 0 if key not in some_over else some_over[key]
-                if timeseries[t][key] > 0:
-                    some_over[key] += 1
-                
-    
-    for key in total_count:
-        table.add_row([key, "% w/ PSI", 100.0 * float(some_over[key])/ float(total_count[key])])
-    return table
-
-def plot_data(timeseries):
-
-    correlation_table = PrettyTable()
-    correlation_table.field_names = ["X","Y", "Correlation", "P-Value"]
-    
-
-    
-    
-
-    def datetime(x):
-        return np.array(x, dtype=np.datetime64)
-
-    chart_pairs = [
-        # ('hhi_bids', 'weighted_average_price'),
-        # ('four_firm_concentration_ratio_bids', 'weighted_average_price'),
-        ('hhi_dispatch_ALL', 'weighted_average_price'),
-        ('entropy_dispatch_ALL', 'weighted_average_price'),
-        ('four_firm_concentration_ratio_dispatch_ALL', 'weighted_average_price'),
-        ('average_rsi_ALL', 'weighted_average_price'),
-        ('minimum_rsi_ALL', 'weighted_average_price'),
-        ('sum_psi_ALL', 'weighted_average_price'),
-    ]
-
-    for state in STATES:
-        if state != 'ALL':
-            chart_pairs.append(['minimum_rsi_'+state, 'price_'+state])
-            chart_pairs.append(['minimum_nersi_'+state, 'price_'+state])
-            chart_pairs.append(['hhi_bids_'+state, 'price_'+state])
-            chart_pairs.append(['hhi_dispatch_'+state, 'price_'+state])
-            chart_pairs.append(['entropy_bids_'+state, 'price_'+state])
-            chart_pairs.append(['entropy_dispatch_'+state, 'price_'+state])
-            # chart_pairs.append(['average_nersi_'+state, 'price_'+state])
-
-
-    
-                   
-
-    variables = {
-        # 'demand_ALL':[],
-        # 'weighted_average_price':[],
-        # 'nsw_demand':[],
-        # 'vic_demand':[],
-        # 'sa_demand':[],
-        # 'qld_demand':[],
-        # 'nsw_price':[],
-        # 'vic_price':[],
-        # 'sa_price':[],
-        # 'qld_price':[],
-        # 'hhi_bids':[],
-        # 'four_firm_concentration_ratio_bids':[],
-        # 'hhi_dispatch':[],
-        # 'four_firm_concentration_ratio_dispatch':[],
-    }
-
-    # Assemble timeseries into arrays of values. 
-    # First get a list of all keys. This is important as some gens enter the market late in the timeseries and without this, you end up with funky timeseries lengths. 
-    all_keys = []
-    for time in sorted(timeseries.keys()):
-        for key in timeseries[time]:
-            if key not in all_keys:
-                all_keys.append(key)
-    # Now do the actual assemblaging into lists. 
-    for time in sorted(timeseries.keys()):
-        for key in all_keys:
-            variables[key] = [] if key not in variables else variables[key]
-            if key in timeseries[time]:
-                variables[key].append(timeseries[time][key])
-            else:
-                variables[key].append(None)
-    
-    plots = []
-
-    for key in all_keys:
-        print("Key: ", key)
-
-    for key in all_keys:
-        if '_nersi_' in key and 'average' not in key and 'minimum' not in key:
-            m = re.search(r'(.*)_nersi_(\w+)', key)
-            firm = m.group(1)
-            state = m.group(2)
-            
-            chart_pairs.append([key, firm+'_weighted_offer_price_'+state])
-
-    # for state in STATES:
-    #     if state != 'ALL':
-    #         run_random_forest_price(timeseries, all_keys, state)
-
-    # timeseries_chart = figure(x_axis_type="datetime", title="Spot Bids")
-    # timeseries_chart.y_range = Range1d(start=0, end=1)
-    # timeseries_chart.extra_y_ranges = {"price": Range1d(start=0, end=200)}
-    # timeseries_chart.grid.grid_line_alpha=0.3
-    # timeseries_chart.xaxis.axis_label = 'Date'
-    # timeseries_chart.yaxis.axis_label = 'Price'
-
-    # # participant_meta = ParticipantService().participant_metadata
-    # for i, metric in enumerate(indices.keys()):
-    #     if metric not in ['weighted_average_price', 'demand_ALL', 'srmc_qgram', 'lrmc_qgram']:
-    #         print(metric)
-    #         color = palette.hex_colors[i % len(palette.hex_colors)]
-    #         timeseries_chart.line(datetime(sorted(timeseries.keys())), indices[metric], color=color, legend=metric)
-
-    # timeseries_chart.legend.location = "top_left"
-
-
-    # plots.append(timeseries_chart)
-
-    
-
-    # X/Y Scatter charts based on chart_pairs
-    for pair in chart_pairs:
-        # get rid of Nones - no good for pearson correlation calc. 
-        x_series = []
-        y_series = []
-        for i in range(len(variables[pair[0]])):
-            # if pair[0] in variables and pair[1] in variables:
-            if variables[pair[0]][i] and variables[pair[1]][i]:
-                x_series.append(variables[pair[0]][i])
-                y_series.append(variables[pair[1]][i])
-        new_plot = figure(title=pair[0] + " as a function of " + pair[1])
-        new_plot.xaxis.axis_label=pair[0]
-        new_plot.yaxis.axis_label=pair[1]
-        new_plot.circle(x_series, y_series)
-        plots.append([new_plot])
-        # print("\n")
-        
-        if len(x_series) > 2:
-            correlation = pearsonr(x_series, y_series)
-            # print(pair[0]," Pearson Correlation with ",pair[1], correlation)
-            correlation_table.add_row([pair[0], pair[1], correlation[0], correlation[1]])
-        else:
-            pass
-            # print("Not enough data points to calculate pearson correlation between ", pair[0],'and', pair[1])
-        # print("\n")
-    
-    # X/Y Scatter with residual supplier inidces of all firms. 
-    for state in STATES:
-        residual_scatter = figure(title=state+" Firm Residual Supply Index as a function of Total Demand")
-        i = 0
-        for variable in variables:
-            # Start a new chart if this one is full. 
-            if i == 20:
-                i = 0
-                plots.append([residual_scatter])
-                residual_scatter = figure(title=state+" Firm Residual Supply Index as a function of Total Demand")
-            # Add data set to chart
-            if '_rsi_'+state in variable and 'average_rsi' not in variable:
-                color = palette.hex_colors[i % len(palette.hex_colors)]
-                residual_scatter.circle(variables['demand_'+state], variables[variable], color=color, legend=variable.replace('_rsi_'+state, ''))
-                i+= 1
-            
-        plots.append([residual_scatter])
-
-    # X/Y Scatter with network-augmented residual supplier inidces of all firms. 
-    for state in STATES:
-        if state != 'ALL':
-            residual_scatter = figure(title=state+" Network-Extended Firm Residual Supply Index as a function of Total Demand")
-            i = 0
-            for variable in variables:
-                # Start a new chart if this one is full. 
-                if i == 20:
-                    i = 0
-                    plots.append([residual_scatter])
-                    residual_scatter = figure(title=state+" Network Extended Firm Residual Supply Index as a function of Total Demand")
-                # Add data set to chart
-                if 'minimum_nersi_'+state in variable and 'average_nersi' not in variable:
-                    color = palette.hex_colors[i % len(palette.hex_colors)]
-                    residual_scatter.circle(variables['demand_'+state], variables[variable], color=color, legend=variable.replace('_nersi_'+state, ''))
-                    i+= 1
-            plots.append([residual_scatter])
-    
-    print(correlation_table)
-    show(gridplot(plots, plot_width=1200, plot_height=600))  # open a browser
-
-    
-
-def table_data(timeseries):
-    hhi_table = get_hhi_stat_table(timeseries)
-    entropy_table = get_entropy_stat_table(timeseries)
-    four_firm_table = get_four_firm_stat_table(timeseries)
-    psi_table = get_psi_stat_table(timeseries)
-    rsi_table = get_rsi_stat_table(timeseries)
-    nersi_table = get_nersi_stat_table(timeseries)
-    print(hhi_table)
-    print(entropy_table)
-    print(four_firm_table)
-    print(psi_table)
-    print(rsi_table)
-    print(nersi_table)
 
 
 if __name__=="__main__":
     start_date = pendulum.datetime(2018,1,1,12)
-    end_date = pendulum.datetime(2018,1,10,12)
+    end_date = pendulum.datetime(2018,12,27,12)
     timeseries = process(start_date, end_date)
     print([key for key in timeseries])
-    plot_data(timeseries)
-    table_data(timeseries)
+    plotting.plot_data(timeseries)
+    tables.table_data(timeseries)

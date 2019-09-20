@@ -5,5 +5,3 @@ class Price(Document):
     price = FloatField()
     region = StringField(indexed=True)
     price_type = StringField(indexed=True)
-
-    
